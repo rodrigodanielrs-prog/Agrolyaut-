@@ -1761,6 +1761,20 @@ function renderPanel(){
         +'<option value="DIC"'+(exp.delin==='DIC'?' selected':'')+'>DIC – Inteiramente Casualizado</option>'
         +'<option value="NONE"'+(exp.delin==='NONE'?' selected':'')+'>Sem delineamento (grade simples)</option>'
       +'</select>'
+      // Bloco 1 sem sorteio toggle — só aparece se DBC ou DIC
+      +(exp.delin!=='NONE'
+        ? '<div style="margin-top:8px;background:var(--card);border:1px solid '+(exp.bloco1Fixed?'var(--yel)':'var(--bord)')+';border-radius:5px;padding:8px 10px;cursor:pointer" onclick="toggleBloco1Fixed('+exp.id+')">'
+          +'<div style="display:flex;align-items:center;gap:8px">'
+            +'<div style="width:34px;height:18px;border-radius:9px;background:'+(exp.bloco1Fixed?'var(--yel)':'var(--bord)')+';position:relative;flex-shrink:0;transition:background .2s">'
+              +'<div style="width:14px;height:14px;background:#fff;border-radius:50%;position:absolute;top:2px;'+(exp.bloco1Fixed?'right:2px':'left:2px')+';transition:all .2s"></div>'
+            +'</div>'
+            +'<div>'
+              +'<div style="font-family:var(--fh);font-size:11px;font-weight:700;color:'+(exp.bloco1Fixed?'var(--yel)':'var(--txt)')+'">Bloco 1 sem sorteio</div>'
+              +'<div style="font-size:10px;color:var(--mut)">'+(exp.bloco1Fixed?'Bloco 1 fixo na ordem T1, T2, T3…':'Todos os blocos sorteados')+'</div>'
+            +'</div>'
+          +'</div>'
+        +'</div>'
+        : '')
       // Grid de parâmetros
       +'<div class="p-grid2">'+'<div><label class="lbl">Nº linhas</label><input type="number" value="'+(exp.nLinhas||5)+'" min="1" max="30" step="1" onchange="onFieldN(this,\'nLinhas\','+exp.id+')" class="p-inp"></div>'+'<div><label class="lbl">Esp. linhas (m)</label><input type="number" value="'+(exp.espLinhas||0.17)+'" min="0.01" step="0.01" onchange="onFieldF(this,\'espLinhas\','+exp.id+')" class="p-inp"></div>'+'</div>'+'<div class="p-grid2">'
         +'<div><label class="lbl">Nº tratamentos</label><input type="number" value="'+exp.nTrat+'" min="1" max="30" onchange="onFieldN(this,\'nTrat\','+exp.id+')" class="p-inp"></div>'
