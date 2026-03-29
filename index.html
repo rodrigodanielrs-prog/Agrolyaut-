@@ -1516,7 +1516,7 @@ function calcPLarg(exp){
   }
 }
 
-function randomizeExp(exp){function randomizeExp(exp){
+function randomizeExp(exp){
   exp.allocs=[];
   var nB=exp.delin==='NONE'?1:exp.nBlocos;
   for(var b=0;b<nB;b++){
@@ -1924,66 +1924,8 @@ function checkOverlaps() {
 }
 
 /* ── SAVE / LOAD PROJECT ─────────────────────────────────── */
-function doSaveProject() {
-  var proj = {
-    version: 1,
-    app: 'AgroLayout',
-    date: new Date().toISOString(),
-    experiments: E2._experiments.map(function(exp) {
-      return {
-        id: exp.id, name: exp.name, color: exp.color,
-        lat: exp.lat, lng: exp.lng, angle: exp.angle,
-        delin: exp.delin, nTrat: exp.nTrat, nBlocos: exp.nBlocos,
-        pLarg: exp.pLarg, pComp: exp.pComp,
-        espTrat: exp.espTrat, espBlocos: exp.espBlocos,
-        tratNames: exp.tratNames, allocs: exp.allocs, visible: exp.visible
-      };
-    })
-  };
-  dl('agrolayout_projeto.json', JSON.stringify(proj, null, 2), 'application/json');
-  showToast('✓ Projeto salvo!', '');
-}
-
-function doLoadProject() {
-  var inp = document.createElement('input'); inp.type='file'; inp.accept='.json';
-  inp.onchange = function(e) {
-    var file = e.target.files[0]; if (!file) return;
-    var reader = new FileReader();
-    reader.onload = function(ev) {
-      try {
-        var proj = JSON.parse(ev.target.result);
-        if (!proj.experiments) throw new Error('Formato inválido');
-        // Clear existing
-        E2._experiments.forEach(function(exp) {
-          exp.layers.forEach(function(l){ window._map.removeLayer(l); });
-          if (exp.marker) window._map.removeLayer(exp.marker);
-        });
-        E2._experiments = [];
-        // Restore
-        proj.experiments.forEach(function(d) {
-          var exp = createExp(d.lat, d.lng);
-          // Override with saved data
-          exp.id=d.id; exp.name=d.name; exp.color=d.color;
-          exp.lat=d.lat; exp.lng=d.lng; exp.angle=d.angle;
-          exp.delin=d.delin; exp.nTrat=d.nTrat; exp.nBlocos=d.nBlocos;
-          exp.pLarg=d.pLarg; exp.pComp=d.pComp;
-          exp.espTrat=d.espTrat; exp.espBlocos=d.espBlocos;
-          exp.tratNames=d.tratNames; exp.allocs=d.allocs; exp.visible=d.visible;
-          E2._experiments.push(exp);
-          addMarker(exp);
-          drawExp(exp);
-        });
-        E2._nextId = Math.max.apply(null, E2._experiments.map(function(e){return e.id;})) + 1;
-        E2._activeExp = E2._experiments.length ? E2._experiments[0].id : null;
-        renderList(); renderPanel();
-        showToast('✓ ' + proj.experiments.length + ' experimentos carregados', '');
-        setSt('Projeto carregado: ' + proj.date.slice(0,10), true);
-      } catch(ex) { showToast('Erro ao carregar projeto', 'tr'); console.error(ex); }
-    };
-    reader.readAsText(file);
-  };
-  inp.click();
-}
+/* doSaveProject moved to core */
+/* doLoadProject moved to core */
 
 /* ── PRINT CROQUI ────────────────────────────────────────── */
 function doPrintCroqui() {
