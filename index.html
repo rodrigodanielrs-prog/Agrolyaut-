@@ -1486,7 +1486,8 @@ var PAL = [
 ];
 var EXP_COLORS = ['#e3b341','#f85149','#79c0ff','#56d364','#d2a8ff','#ffa657','#ff7b72','#58a6ff'];
 
-var window._map, E2._areaLayers=[], E2._experiments=[], E2._nextId=1, E2._activeExp=null;
+var E2 = {};
+E2._areaLayers=[]; E2._experiments=[]; E2._nextId=1; E2._activeExp=null;
 
 /* ── EXPERIMENT FACTORY ──────────────────────────────────── */
 function createExp(lat,lng){
