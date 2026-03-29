@@ -2189,12 +2189,15 @@ function tutShow() {
 
 function tutClose() {
   tutOpen = false;
-  document.getElementById('tut-overlay').classList.remove('active');
+  var overlay = document.getElementById('tut-overlay');
+  overlay.classList.remove('active');
+  overlay.style.display = 'none';
   try { localStorage.setItem('agrolayout-tut-done','1'); } catch(e){}
-  // Remove any highlights
   document.querySelectorAll('.tut-highlight').forEach(function(el){
     el.classList.remove('tut-highlight');
   });
+  // Return to step 1 after tutorial
+  goStep(1);
 }
 
 function tutNext() {
@@ -2213,7 +2216,9 @@ function tutPrev() {
 function showTutAgain() {
   try { localStorage.removeItem('agrolayout-tut-done'); } catch(e){}
   tutOpen = true; tutIdx = 0;
-  document.getElementById('tut-overlay').classList.add('active');
+  var overlay = document.getElementById('tut-overlay');
+  overlay.style.display = '';
+  overlay.classList.add('active');
   tutRender();
 }
 
