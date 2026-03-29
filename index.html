@@ -848,12 +848,32 @@ body{background:var(--bg);color:var(--txt);font-family:var(--fm);font-size:12px;
 
 /* ── MOBILE ── */
 @media(max-width:700px){
-  .side{width:100%;max-height:44vh;border-right:none;border-bottom:1px solid var(--bord)}
   .app-body{flex-direction:column}
-  .map-wrap{min-height:56vh}
+  .side{
+    width:100%;
+    height:auto;
+    max-height:38vh;
+    border-right:none;
+    border-bottom:1px solid var(--bord);
+    flex-shrink:0;
+  }
+  .side-scroll{
+    overflow-y:auto;
+    -webkit-overflow-scrolling:touch;
+  }
+  .map-wrap{flex:1;min-height:0}
   .logo{font-size:16px}
   .tab-btn{font-size:9px;padding:5px 2px}
   .nav-btn{padding:7px 12px;font-size:11px}
+  /* Make buttons always visible by keeping sec compact */
+  .sec{padding:8px 10px}
+  .btn{padding:6px 10px;margin-bottom:3px}
+  .zoom-ctrl{padding:6px 10px}
+}
+/* Extra small phones */
+@media(max-width:380px){
+  .side{max-height:35vh}
+  .tab-btn{font-size:8px;padding:4px 1px}
 }
 @media print{.header,.side,.statusbar,.nav-footer{display:none!important}.app-body{display:block}.map-wrap,#map{width:100%;height:100vh}}
 .leaflet-tooltip{background:rgba(7,9,10,.9)!important;border:1px solid rgba(255,255,255,.15)!important;color:#fff!important;font-size:10px!important;padding:2px 6px!important;box-shadow:none!important}
@@ -1187,7 +1207,8 @@ function goStep(n) {
   if (n!==1) cancelDraw();
   // Re-render panels
   if (n===3) renderVars();
-  setTimeout(function(){ MAP.invalidateSize(); }, 120);
+  setTimeout(function(){ if(MAP){ MAP.invalidateSize(); } }, 150);
+  setTimeout(function(){ if(MAP){ MAP.invalidateSize(); } }, 400);
 }
 
 function goNext(){ if(STEP<4) goStep(STEP+1); }
@@ -1441,29 +1462,27 @@ function randomize(exp) {
   }
 }
 
-function getAreaSW() {
-  // Try areaFeats first
+function getAreaCenter() {
+  // Try areaLayers via Leaflet bounds (most reliable, works after importGJ)
+  if (areaLayers.length) {
+    try {
+      return L.featureGroup(areaLayers).getBounds().getCenter();
+    } catch(e) {}
+  }
+  // Try areaFeats centroid
   var areas = areaFeats.filter(function(f){ return f.type === 'area'; });
   if (areas.length) {
     var coords = areas[0].gj.geometry.coordinates[0];
-    var sw = coords.reduce(function(best, c) {
-      return (c[1] - c[0] * 0.001) < (best[1] - best[0] * 0.001) ? c : best;
-    }, coords[0]);
-    return L.latLng(sw[1], sw[0]);
+    var lat = 0, lng = 0;
+    coords.forEach(function(c){ lng += c[0]; lat += c[1]; });
+    return L.latLng(lat / coords.length, lng / coords.length);
   }
-  // Try Leaflet layers directly (works when loaded via importGJ)
-  if (areaLayers.length) {
-    try {
-      var bounds = L.featureGroup(areaLayers).getBounds();
-      return bounds.getSouthWest();
-    } catch(e) {}
-  }
-  // Fallback: center of current map view
+  // Fallback: map center
   return MAP.getCenter();
 }
 
 function addExp() {
-  var pos = getAreaSW();
+  var pos = getAreaCenter();
   var exp = newExp(pos.lat, pos.lng);
   randomize(exp);
   exps.push(exp);
