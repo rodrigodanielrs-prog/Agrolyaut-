@@ -890,6 +890,7 @@ input:focus,select:focus{border-color:var(--grn)}
         <div class="sec-title">Experimentos</div>
         <div id="exp-list"><div class="el-empty">Nenhum experimento ainda</div></div>
         <button class="btn btn-grn" style="width:100%;margin-top:7px" onclick="doAddExp()">＋ Adicionar Experimento</button>
+        <button class="btn btn-ghost" style="width:100%;margin-top:4px" onclick="fitAllExps()">🔍 Ver todos os experimentos</button>
         <button class="btn btn-ghost" style="width:100%;margin-top:4px" onclick="checkOverlaps()">🔍 Verificar Sobreposições</button>
         <div id="overlap-status" style="font-size:10px;color:var(--mut);padding:4px 2px;line-height:1.5"></div>
       </div>
@@ -1051,10 +1052,10 @@ var APP = {
 
 /* ── MAP INIT ───────────────────────────────────── */
 function initMap() {
-  window._map = L.map('map', {zoomControl:true}).setView([-27.7745,-54.3620],18);
-  var tSat    = L.tileLayer('https://mt{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',{attribution:'© Google',maxZoom:21,subdomains:'0123'});
-  var tHybrid = L.tileLayer('https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',{attribution:'© Google',maxZoom:21,subdomains:'0123'});
-  var tOSM    = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OSM',maxZoom:19,subdomains:'abc'});
+  window._map = L.map('map', {zoomControl:true, maxZoom:23}).setView([-27.7745,-54.3620],18);
+  var tSat    = L.tileLayer('https://mt{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',{attribution:'© Google',maxZoom:23,maxNativeZoom:21,subdomains:'0123'});
+  var tHybrid = L.tileLayer('https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',{attribution:'© Google',maxZoom:23,maxNativeZoom:21,subdomains:'0123'});
+  var tOSM    = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OSM',maxZoom:23,maxNativeZoom:19,subdomains:'abc'});
   tSat.addTo(window._map);
   L.control.layers({'🛰 Satélite':tSat,'🛰 Híbrido':tHybrid,'🗺 OSM':tOSM},{},{position:'topright',collapsed:false}).addTo(window._map);
   L.control.scale({imperial:false,position:'bottomright'}).addTo(window._map);
@@ -1117,7 +1118,8 @@ function doSaveProject() {
     experiments: E2._experiments.map(function(exp){
       return {id:exp.id,name:exp.name,color:exp.color,lat:exp.lat,lng:exp.lng,angle:exp.angle,
               delin:exp.delin,nTrat:exp.nTrat,nBlocos:exp.nBlocos,pLarg:exp.pLarg,pComp:exp.pComp,
-              espTrat:exp.espTrat,espBlocos:exp.espBlocos,tratNames:exp.tratNames,allocs:exp.allocs,visible:exp.visible};
+              nLinhas:exp.nLinhas,espLinhas:exp.espLinhas,
+              espTrat:exp.espTrat,espBlocos:exp.espBlocos,tratNames:exp.tratNames,allocs:exp.allocs,visible:exp.visible,bloco1Fixed:exp.bloco1Fixed};
     }),
     variables: E3.variables
   };
@@ -1497,20 +1499,43 @@ function createExp(lat,lng){
     lat:lat, lng:lng, angle:0,
     delin:'DBC',
     nTrat:8, nBlocos:4,
+    nLinhas:5, espLinhas:0.17,
     pLarg:0.85, pComp:5.0,
     espTrat:0.0,   // between plots within block (across-treatment direction)
-    espLinhas:0.0, // between plots within block (along-plot direction) — rarely used but available
+    espLinhas_blocos:0.0, // between plots within block (along-plot direction) — rarely used but available
     espBlocos:1.0, // between blocks
     tratNames:Array.from({length:16},function(_,i){return 'T'+(i+1);}),
-    layers:[], marker:null, allocs:null, visible:true
+    layers:[], marker:null, allocs:null, visible:true, bloco1Fixed:false
   };
 }
 
-function randomizeExp(exp){
+function calcPLarg(exp){
+  // Largura da parcela = nLinhas * espLinhas (entre linhas)
+  if (exp.nLinhas && exp.espLinhas) {
+    exp.pLarg = parseFloat((exp.nLinhas * exp.espLinhas).toFixed(3));
+  }
+}
+
+function randomizeExp(exp){function randomizeExp(exp){
   exp.allocs=[];
   var nB=exp.delin==='NONE'?1:exp.nBlocos;
-  for(var b=0;b<nB;b++)
-    exp.allocs.push(shuffle(Array.from({length:exp.nTrat},function(_,i){return i;})));
+  for(var b=0;b<nB;b++){
+    // Bloco 1 sem sorteio se flag ativa
+    if(b===0 && exp.bloco1Fixed){
+      exp.allocs.push(Array.from({length:exp.nTrat},function(_,i){return i;}));
+    } else {
+      exp.allocs.push(shuffle(Array.from({length:exp.nTrat},function(_,i){return i;})));
+    }
+  }
+}
+
+function toggleBloco1Fixed(id){
+  var exp=getExp(id); if(!exp) return;
+  exp.bloco1Fixed = !exp.bloco1Fixed;
+  randomizeExp(exp);
+  drawExp(exp);
+  renderPanel();
+  showToast(exp.bloco1Fixed ? '✓ Bloco 1 fixo (sem sorteio)' : 'Bloco 1 aleatorizado', exp.bloco1Fixed?'':'ty');
 }
 
 /* ── MAP INIT ────────────────────────────────────────────── */
@@ -1527,8 +1552,43 @@ function doAddExp(){
   drawExp(exp);
   renderList();
   renderPanel();
+  // Auto-zoom to show parcels at real scale
+  autoZoomExp(exp);
   showToast('✓ '+exp.name+' adicionado','');
   setSt(exp.name+' — arraste o marcador colorido para posicionar',true);
+}
+
+function autoZoomExp(exp) {
+  if (!exp._gj || !exp._gj.length) return;
+  var lats=[], lngs=[];
+  exp._gj.forEach(function(f){
+    f.geometry.coordinates[0].forEach(function(c){
+      lngs.push(c[0]); lats.push(c[1]);
+    });
+  });
+  var sw = L.latLng(Math.min.apply(null,lats), Math.min.apply(null,lngs));
+  var ne = L.latLng(Math.max.apply(null,lats), Math.max.apply(null,lngs));
+  // maxZoom:23 permite overzoom — parcelas ficam em escala real
+  window._map.fitBounds(L.latLngBounds(sw, ne), {padding:[60,60], maxZoom:23});
+}
+
+function fitExp(id) {
+  var exp = getExp(id); if (!exp) return;
+  autoZoomExp(exp);
+}
+
+function fitAllExps() {
+  var lats=[], lngs=[];
+  E2._experiments.forEach(function(exp){
+    if (!exp._gj) return;
+    exp._gj.forEach(function(f){
+      f.geometry.coordinates[0].forEach(function(c){ lngs.push(c[0]); lats.push(c[1]); });
+    });
+  });
+  if (!lats.length) { showToast('Nenhum experimento para centralizar','ty'); return; }
+  var sw = L.latLng(Math.min.apply(null,lats), Math.min.apply(null,lngs));
+  var ne = L.latLng(Math.max.apply(null,lats), Math.max.apply(null,lngs));
+  window._map.fitBounds(L.latLngBounds(sw,ne), {padding:[60,60], maxZoom:23});
 }
 
 function selectExp(id){
@@ -1571,11 +1631,13 @@ function addMarker(exp){
   }).addTo(window._map);
   exp.marker.bindTooltip(exp.name+' — arraste para mover',{direction:'top'});
   exp.marker.on('drag',function(e){exp.lat=e.latlng.lat;exp.lng=e.latlng.lng;drawExp(exp);});
+  exp.marker.on('dragend',function(){autoZoomExp(exp);});
   exp.marker.on('click',function(){selectExp(exp.id);});
 }
 
 /* ── DRAW ────────────────────────────────────────────────── */
 function drawExp(exp){
+  calcPLarg(exp); // recalc width from lines
   exp.layers.forEach(function(l){window._map.removeLayer(l);});
   exp.layers=[];
   if(!exp.visible) return;
@@ -1688,7 +1750,9 @@ function renderPanel(){
       +'<div style="display:flex;gap:6px;margin-bottom:8px">'
         +'<input type="text" value="'+exp.name+'" style="flex:1;background:var(--card);border:1px solid var(--bord);color:var(--txt);font-family:var(--fm);font-size:11px;padding:5px 8px;border-radius:4px;outline:none" oninput="onExpName(this,'+exp.id+')" placeholder="Nome">'
         +'<button class="btn btn-ghost" onclick="doRandomize()" style="padding:5px 9px" title="Nova aleatorização">🔀</button>'
+      +'<button class="btn" style="padding:5px 9px;font-size:10px;'+(exp.bloco1Fixed?'background:var(--yel);color:#07090a;font-weight:700':'background:var(--card);color:var(--mut);border:1px solid var(--bord)')+'" onclick="toggleBloco1Fixed('+exp.id+')" title="Bloco 1 sem sorteio">B1=</button>'
         +'<button class="btn" style="padding:5px 9px;background:'+exp.color+'22;color:'+exp.color+';border:1px solid '+exp.color+'44" onclick="toggleVis('+exp.id+')" title="Mostrar/ocultar">👁</button>'
+      +'<button class="btn btn-ghost" onclick="fitExp('+exp.id+')" style="padding:5px 8px" title="Zoom para este experimento">🔍</button>'
       +'</div>'
       // Delineamento
       +'<label class="lbl">Delineamento</label>'
@@ -1698,12 +1762,12 @@ function renderPanel(){
         +'<option value="NONE"'+(exp.delin==='NONE'?' selected':'')+'>Sem delineamento (grade simples)</option>'
       +'</select>'
       // Grid de parâmetros
-      +'<div class="p-grid2">'
+      +'<div class="p-grid2">'+'<div><label class="lbl">Nº linhas</label><input type="number" value="'+(exp.nLinhas||5)+'" min="1" max="30" step="1" onchange="onFieldN(this,\'nLinhas\','+exp.id+')" class="p-inp"></div>'+'<div><label class="lbl">Esp. linhas (m)</label><input type="number" value="'+(exp.espLinhas||0.17)+'" min="0.01" step="0.01" onchange="onFieldF(this,\'espLinhas\','+exp.id+')" class="p-inp"></div>'+'</div>'+'<div class="p-grid2">'
         +'<div><label class="lbl">Nº tratamentos</label><input type="number" value="'+exp.nTrat+'" min="1" max="30" onchange="onFieldN(this,\'nTrat\','+exp.id+')" class="p-inp"></div>'
         +'<div><label class="lbl">Nº blocos</label><input type="number" value="'+exp.nBlocos+'" min="1" max="12" onchange="onFieldN(this,\'nBlocos\','+exp.id+')" class="p-inp" '+(exp.delin==='NONE'?'disabled':'')+' ></div>'
       +'</div>'
-      +'<div class="p-grid2">'
-        +'<div><label class="lbl">Larg. parcela (m)</label><input type="number" value="'+exp.pLarg+'" min="0.1" step="0.05" onchange="onFieldF(this,\'pLarg\','+exp.id+')" class="p-inp"></div>'
+      +'<div class="p-grid2">'+'<div><label class="lbl">Nº linhas</label><input type="number" value="'+(exp.nLinhas||5)+'" min="1" max="30" step="1" onchange="onFieldN(this,\'nLinhas\','+exp.id+')" class="p-inp"></div>'+'<div><label class="lbl">Esp. linhas (m)</label><input type="number" value="'+(exp.espLinhas||0.17)+'" min="0.01" step="0.01" onchange="onFieldF(this,\'espLinhas\','+exp.id+')" class="p-inp"></div>'+'</div>'+'<div class="p-grid2">'
+        +'<div><label class="lbl">Larg. parcela (m) ✓auto</label><input type="number" value="'+exp.pLarg+'" min="0.1" step="0.05" onchange="onFieldF(this,\'pLarg\','+exp.id+')" class="p-inp"></div>'
         +'<div><label class="lbl">Comp. parcela (m)</label><input type="number" value="'+exp.pComp+'" min="0.5" step="0.5" onchange="onFieldF(this,\'pComp\','+exp.id+')" class="p-inp"></div>'
       +'</div>'
       +'<div class="p-grid2">'
@@ -1720,6 +1784,7 @@ function renderPanel(){
       +'</div>'
       // Dimensões calculadas
       +'<div class="p-info">'
+        +'<b>'+(exp.nLinhas||'?')+'</b> linhas × <b>'+(exp.espLinhas||'?')+'</b> m = <b style=\'color:var(--grn)\'>'+(exp.pLarg.toFixed(3))+' m</b> largura<br>'
         +'<b>'+blockW+'</b> × <b>'+totalH+'</b> m &nbsp;|&nbsp; '
         +'<span style="color:var(--grn)"><b>'+(exp.nTrat*nB)+'</b> parcelas</span> &nbsp;|&nbsp; '
         +'<span style="color:var(--yel)">≈'+area+' ha</span>'
