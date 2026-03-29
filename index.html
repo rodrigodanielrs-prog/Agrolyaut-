@@ -891,6 +891,27 @@ input:focus,select:focus{border-color:var(--grn)}
         <div id="exp-list"><div class="el-empty">Nenhum experimento ainda</div></div>
         <button class="btn btn-grn" style="width:100%;margin-top:7px" onclick="doAddExp()">＋ Adicionar Experimento</button>
         <button class="btn btn-ghost" style="width:100%;margin-top:4px" onclick="fitAllExps()">🔍 Ver todos os experimentos</button>
+        <div style="margin-top:10px;border-top:1px solid var(--bord);padding-top:10px">
+          <div class="sec-title">Zoom do Mapa</div>
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+            <button class="btn btn-ghost" onclick="zoomMap(-1)" style="padding:4px 12px;font-size:16px;font-weight:700">−</button>
+            <input type="range" id="zoom-slider" min="1" max="23" step="1" value="18"
+              style="flex:1;accent-color:var(--grn);height:6px"
+              oninput="setZoom(parseInt(this.value))">
+            <button class="btn btn-ghost" onclick="zoomMap(1)" style="padding:4px 12px;font-size:16px;font-weight:700">+</button>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--mut);margin-bottom:6px">
+            <span>Visão geral</span>
+            <span id="zoom-label" style="color:var(--grn);font-weight:700">Zoom 18</span>
+            <span>Máximo</span>
+          </div>
+          <div style="display:flex;gap:4px;flex-wrap:wrap">
+            <button class="btn btn-ghost" onclick="setZoom(15)" style="flex:1;font-size:10px;padding:4px 6px">15 — Propriedade</button>
+            <button class="btn btn-ghost" onclick="setZoom(18)" style="flex:1;font-size:10px;padding:4px 6px">18 — Talhão</button>
+            <button class="btn btn-ghost" onclick="setZoom(21)" style="flex:1;font-size:10px;padding:4px 6px">21 — Parcelas</button>
+            <button class="btn btn-ghost" onclick="setZoom(23)" style="flex:1;font-size:10px;padding:4px 6px">23 — Detalhe</button>
+          </div>
+        </div>
         <button class="btn btn-ghost" style="width:100%;margin-top:4px" onclick="checkOverlaps()">🔍 Verificar Sobreposições</button>
         <div id="overlap-status" style="font-size:10px;color:var(--mut);padding:4px 2px;line-height:1.5"></div>
       </div>
@@ -1062,6 +1083,7 @@ function initMap() {
   window._map.on('mousemove',function(e){
     document.getElementById('s-coord').textContent = e.latlng.lat.toFixed(6)+', '+e.latlng.lng.toFixed(6);
   });
+  window._map.on('zoomend', function(){ syncZoomSlider(); });
   window._map.on('draw:created', function(e) {
     if (APP.currentStep===1) E1.onDrawCreated(e);
   });
@@ -1188,6 +1210,28 @@ function makeCorners(lat,lng,x0,y0,w,h,deg){
   return [offsetM(lat,lng,x0,y0,deg),offsetM(lat,lng,x0+w,y0,deg),offsetM(lat,lng,x0+w,y0+h,deg),offsetM(lat,lng,x0,y0+h,deg)];
 }
 function shuffle(arr){var a=arr.slice();for(var i=a.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=a[i];a[i]=a[j];a[j]=t;}return a;}
+function setZoom(z) {
+  z = Math.max(1, Math.min(23, z));
+  window._map.setZoom(z);
+  var sl = document.getElementById('zoom-slider');
+  if (sl) sl.value = z;
+  var lb = document.getElementById('zoom-label');
+  if (lb) lb.textContent = 'Zoom ' + z;
+}
+
+function zoomMap(delta) {
+  setZoom(window._map.getZoom() + delta);
+}
+
+// Sync slider when map zoom changes (scroll wheel, pinch, etc.)
+function syncZoomSlider() {
+  var z = window._map.getZoom();
+  var sl = document.getElementById('zoom-slider');
+  if (sl) sl.value = z;
+  var lb = document.getElementById('zoom-label');
+  if (lb) lb.textContent = 'Zoom ' + Math.round(z);
+}
+
 function xe(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 function dl(n,c,m){var a=document.createElement('a');a.href='data:'+m+';charset=utf-8,'+encodeURIComponent(c);a.download=n;a.click();}
 function setSt(msg,on){document.getElementById('s-msg').textContent=msg;document.getElementById('s-dot').className=on?'on':'';}
