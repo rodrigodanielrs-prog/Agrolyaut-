@@ -966,6 +966,12 @@ input:focus,select:focus{border-color:var(--grn)}
   <div class="map-wrap">
     <div id="map"></div>
     <div id="e1-mbub">Comprimento: <b id="e1-mdist">0 m</b> · duplo-clique para finalizar</div>
+    <button onclick="geoLocate(false)" title="Minha localização" style="
+      position:absolute;bottom:80px;right:10px;z-index:700;
+      width:36px;height:36px;border-radius:50%;border:2px solid #fff;
+      background:#0d1117;color:#3fb950;font-size:18px;cursor:pointer;
+      display:flex;align-items:center;justify-content:center;
+      box-shadow:0 2px 8px rgba(0,0,0,.5)">📍</button>
   </div>
 
 </div>
@@ -1196,7 +1202,46 @@ window.addEventListener('load', function() {
   E2.init();
   E3.renderVarList();
   goStep(1);
+  // Auto-locate on load
+  geoLocate(true);
 });
+
+function geoLocate(silent) {
+  if (!navigator.geolocation) {
+    if (!silent) showToast('Geolocalização não disponível','ty');
+    return;
+  }
+  setSt('Obtendo localização GPS…', true);
+  navigator.geolocation.getCurrentPosition(
+    function(pos) {
+      var lat = pos.coords.latitude;
+      var lng = pos.coords.longitude;
+      var acc = pos.coords.accuracy;
+      window._map.setView([lat, lng], 19);
+      // Add/update user location marker
+      if (window._geoMarker) window._map.removeLayer(window._geoMarker);
+      if (window._geoCircle)  window._map.removeLayer(window._geoCircle);
+      window._geoMarker = L.marker([lat, lng], {
+        icon: L.divIcon({
+          html: '<div style="width:16px;height:16px;background:#3fb950;border:3px solid #fff;border-radius:50%;box-shadow:0 0 10px #3fb95099"></div>',
+          iconSize:[16,16], iconAnchor:[8,8], className:''
+        }),
+        zIndexOffset: 2000
+      }).addTo(window._map).bindTooltip('📍 Você está aqui (±'+Math.round(acc)+' m)', {direction:'top'});
+      if (acc < 200) {
+        window._geoCircle = L.circle([lat,lng], {radius:acc, color:'#3fb950', weight:1, fillColor:'#3fb950', fillOpacity:0.08}).addTo(window._map);
+      }
+      setSt('📍 Localizado: ' + lat.toFixed(5) + ', ' + lng.toFixed(5) + ' (±' + Math.round(acc) + ' m)', true);
+      if (!silent) showToast('✓ Localização obtida!','');
+    },
+    function(err) {
+      var msgs = {1:'Permissão negada', 2:'Posição indisponível', 3:'Tempo esgotado'};
+      if (!silent) showToast('GPS: ' + (msgs[err.code]||err.message), 'ty');
+      setSt('GPS indisponível — navegue manualmente pelo mapa', false);
+    },
+    {enableHighAccuracy: true, timeout: 10000, maximumAge: 0}
+  );
+}
 </script>
 <script>/* ════════════════════════════════════════════════
    ETAPA 1 — Mapeamento de Área
