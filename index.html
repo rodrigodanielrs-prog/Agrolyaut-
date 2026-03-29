@@ -1532,20 +1532,32 @@ function randomize(exp) {
 }
 
 function getAreaCenter() {
-  // Try areaLayers via Leaflet bounds (most reliable, works after importGJ)
-  if (areaLayers.length) {
+  // Only use area polygon layers (not terraco lines which skew the center)
+  var areaOnly = areaFeats.filter(function(f){ return f.type === 'area'; });
+
+  // Use areaFeats centroid (most accurate - from polygon coordinates)
+  if (areaOnly.length) {
     try {
-      return L.featureGroup(areaLayers).getBounds().getCenter();
+      var coords = areaOnly[0].gj.geometry.coordinates[0];
+      var lat = 0, lng = 0, n = coords.length;
+      for (var i = 0; i < n; i++) { lng += coords[i][0]; lat += coords[i][1]; }
+      return L.latLng(lat / n, lng / n);
     } catch(e) {}
   }
-  // Try areaFeats centroid
-  var areas = areaFeats.filter(function(f){ return f.type === 'area'; });
-  if (areas.length) {
-    var coords = areas[0].gj.geometry.coordinates[0];
-    var lat = 0, lng = 0;
-    coords.forEach(function(c){ lng += c[0]; lat += c[1]; });
-    return L.latLng(lat / coords.length, lng / coords.length);
+
+  // Try Leaflet layer bounds as fallback (may include terracos)
+  if (areaLayers.length) {
+    try {
+      // Filter: only polygon layers (area), not polylines (terraco)
+      var polyLyrs = areaLayers.filter(function(l) {
+        return l.getBounds && typeof l.getBounds === 'function';
+      });
+      if (polyLyrs.length) {
+        return L.featureGroup(polyLyrs).getBounds().getCenter();
+      }
+    } catch(e) {}
   }
+
   // Fallback: map center
   return MAP.getCenter();
 }
@@ -2109,44 +2121,57 @@ var TUT_STEPS = [
   {
     title: 'Bem-vindo ao AgroLayout! 🌾',
     desc:  'Este assistente vai te guiar na montagem do seu experimento agrícola em <b>4 etapas simples</b>.<br><br>Toque em <span class="hi">Próximo</span> para começar.',
-    target: null,
-    arrow: null,
-    pos: 'center'
+    target: null, arrow: null, pos: 'center', step: null
   },
   {
-    title: '1. Demarque a Área',
-    desc:  'Na <b>Etapa 1</b>, clique em <span class="hi">🟩 Área Experimental</span> e trace o polígono da sua área no mapa de satélite.<br><br>Depois clique em <span class="hi">〰️ Terraço</span> para marcar os terraços.',
-    target: 'tc-area',
-    arrow: 'left',
-    pos: 'right'
+    title: '📍 Etapa 1 — Demarque a Área',
+    desc:  'Clique em <span class="hi">🟩 Área Experimental</span> e trace o polígono da sua área no satélite.<br><br>Clique ponto a ponto e <b>duplo-clique</b> para fechar. Nomeie e confirme.',
+    target: 'tc-area', arrow: 'left', pos: 'right', step: 1
   },
   {
-    title: '2. Salve a Área',
-    desc:  'Após demarcar, clique em <span class="hi">💾 Salvar GeoJSON</span> para guardar o mapeamento.<br><br>Este arquivo será usado nas próximas sessões.',
-    target: null,
-    arrow: null,
-    pos: 'center'
+    title: '〰️ Marque os Terraços',
+    desc:  'Clique em <span class="hi">〰️ Terraço</span> e trace cada linha de terraceamento sobre o satélite.<br><br>Os terraços serão usados para calcular automaticamente a <b>rotação das parcelas</b>.',
+    target: 'tc-terr', arrow: 'left', pos: 'right', step: 1
   },
   {
-    title: '3. Adicione os Experimentos',
-    desc:  'Vá para a <b>Etapa 2</b> e clique em <span class="hi">＋ Adicionar Experimento</span>.<br><br>Configure o delineamento, número de tratamentos, blocos e dimensões das parcelas.',
-    target: 'tab2',
-    arrow: 'down',
-    pos: 'below-tab'
+    title: '💾 Salve o Mapeamento',
+    desc:  'Clique em <span class="hi">💾 Salvar GeoJSON</span> para guardar área e terraços.<br><br>Este arquivo pode ser <b>reimportado</b> em outras sessões para não perder o trabalho.',
+    target: null, arrow: null, pos: 'center', step: 1
   },
   {
-    title: '4. Posicione e Gire',
-    desc:  'Arraste o <b>marcador colorido</b> para posicionar o experimento dentro da área.<br><br>Use o <span class="hi">slider de rotação</span> para alinhar as parcelas com os terraços.',
-    target: null,
-    arrow: null,
-    pos: 'center'
+    title: '🧪 Etapa 2 — Adicione Experimentos',
+    desc:  'Clique em <span class="hi">＋ Adicionar Experimento</span>.<br><br>Configure: delineamento (<b>DBC/DIC</b>), nº de tratamentos, blocos, linhas por parcela e espaçamentos.',
+    target: 'tab2', arrow: 'down', pos: 'below-tab', step: 2
   },
   {
-    title: '5. Variáveis e Croqui',
-    desc:  'Na <b>Etapa 3</b> cadastre as variáveis e exporte o <span class="hi">caderno de campo (.xlsx)</span>.<br><br>Na <b>Etapa 4</b> gere o <span class="hi">croqui para impressão</span> com a tabela de aleatorização.',
-    target: null,
-    arrow: null,
-    pos: 'center'
+    title: '🔄 Posicione e Gire',
+    desc:  'Arraste o <b>marcador colorido numerado</b> para posicionar o experimento dentro da área.<br><br>Use o <span class="hi">slider de rotação</span> para alinhar as parcelas perpendiculares aos terraços.',
+    target: null, arrow: null, pos: 'center', step: 2
+  },
+  {
+    title: '🔀 Aleatorização',
+    desc:  'Clique em <span class="hi">🔀</span> para gerar uma nova aleatorização dos tratamentos.<br><br>Ative <span class="hi">Bloco 1 sem sorteio</span> se quiser manter o primeiro bloco na ordem original como referência.',
+    target: null, arrow: null, pos: 'center', step: 2
+  },
+  {
+    title: '📋 Etapa 3 — Variáveis',
+    desc:  'Cadastre as <b>variáveis que serão avaliadas</b>: estatura, MMG, acamamento, produtividade, etc.<br><br>Defina o nº de <span class="hi">sub-amostras</span> por parcela (ex: 10 plantas para estatura).',
+    target: 'tab3', arrow: 'down', pos: 'below-tab', step: 3
+  },
+  {
+    title: '📊 Caderno de Campo',
+    desc:  'Clique em <span class="hi">📊 Baixar Planilha (.xlsx)</span> para exportar o caderno de campo pronto para preenchimento.<br><br>Uma aba por experimento, com colunas para cada variável e sub-amostra.',
+    target: null, arrow: null, pos: 'center', step: 3
+  },
+  {
+    title: '🖨 Etapa 4 — Croqui',
+    desc:  'Clique em <span class="hi">🖨 Gerar Croqui</span> para imprimir ou salvar em PDF.<br><br>Contém: croqui visual colorido, tabela de aleatorização e coordenadas GPS de cada parcela.',
+    target: 'tab4', arrow: 'down', pos: 'below-tab', step: 4
+  },
+  {
+    title: '✅ Pronto para usar!',
+    desc:  'Você já sabe tudo! <b>Bom trabalho em campo!</b> 🌱<br><br>Toque no botão <span class="hi">?</span> no cabeçalho a qualquer momento para rever este tutorial.',
+    target: null, arrow: null, pos: 'center', step: 1
   }
 ];
 
@@ -2198,6 +2223,13 @@ function tutRender() {
   var box   = document.getElementById('tut-box');
   var arrow = document.getElementById('tut-arrow');
 
+  // Navigate to the relevant step
+  if (step.step !== null && step.step !== undefined) {
+    goStep(step.step);
+    // Wait for panel to render, then position box
+    setTimeout(function(){ tutPositionBox(step, box, arrow); }, 200);
+  }
+
   document.getElementById('tut-step').textContent  = 'Passo ' + (tutIdx+1) + ' de ' + total;
   document.getElementById('tut-title').textContent = step.title;
   document.getElementById('tut-desc').innerHTML    = step.desc;
@@ -2209,6 +2241,14 @@ function tutRender() {
   for (var i=0; i<total; i++) dots += '<div class="tut-dot'+(i===tutIdx?' cur':'')+'" onclick="tutGoTo('+i+')"></div>';
   document.getElementById('tut-dots').innerHTML = dots;
 
+  // Position immediately if no step navigation needed
+  if (!step.step) tutPositionBox(step, box, arrow);
+}
+
+function tutPositionBox(step, box, arrow) {
+  box   = box   || document.getElementById('tut-box');
+  arrow = arrow || document.getElementById('tut-arrow');
+
   // Remove old highlights
   document.querySelectorAll('.tut-highlight').forEach(function(el){
     el.classList.remove('tut-highlight');
@@ -2217,11 +2257,11 @@ function tutRender() {
 
   // Position box and highlight target
   if (step.pos === 'center' || !step.target) {
-    box.style.top    = '50%';
-    box.style.left   = '50%';
+    box.style.top       = '50%';
+    box.style.left      = '50%';
     box.style.transform = 'translate(-50%, -50%)';
-    box.style.bottom = '';
-    box.style.right  = '';
+    box.style.bottom    = '';
+    box.style.right     = '';
     arrow.style.display = 'none';
   } else if (step.pos === 'right' && step.target) {
     var el = document.getElementById(step.target);
@@ -2254,13 +2294,11 @@ function tutRender() {
   // Keep box inside viewport
   setTimeout(function(){
     var br = box.getBoundingClientRect();
-    if (br.right > window.innerWidth - 10) {
+    if (br.right > window.innerWidth - 10)
       box.style.left = Math.max(10, window.innerWidth - br.width - 10) + 'px';
-    }
-    if (br.bottom > window.innerHeight - 10) {
-      box.style.top = Math.max(10, window.innerHeight - br.height - 10) + 'px';
-    }
-  }, 10);
+    if (br.bottom > window.innerHeight - 10)
+      box.style.top  = Math.max(10, window.innerHeight - br.height - 10) + 'px';
+  }, 50);
 }
 
 function tutGoTo(i) { tutIdx = i; tutRender(); }
