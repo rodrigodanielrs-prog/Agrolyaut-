@@ -1077,37 +1077,33 @@ function initMap() {
 /* ── NAVIGATION ─────────────────────────────────── */
 function goStep(n) {
   if (n<1||n>APP.totalSteps) return;
-
-  // Deactivate current
-  if (APP.currentStep===1) E1.deactivate();
-  if (APP.currentStep===2) E2.deactivate();
-
   APP.currentStep = n;
 
-  // Update step indicators
+  // Update step buttons
   for (var i=1;i<=APP.totalSteps;i++) {
     var btn = document.getElementById('step-btn-'+i);
     if (btn) btn.className = 'step-btn' + (i===n?' step-active':(i<n?' step-done':''));
   }
 
-  // Show/hide panels
+  // Show/hide side panels only — map layers always stay visible
   document.getElementById('panel-1').style.display = n===1 ? 'flex' : 'none';
   document.getElementById('panel-2').style.display = n===2 ? 'flex' : 'none';
   document.getElementById('panel-3').style.display = n===3 ? 'flex' : 'none';
   document.getElementById('panel-4').style.display = n===4 ? 'flex' : 'none';
 
-  // Activate new step
-  if (n===1) E1.activate();
-  if (n===2) E2.activate();
+  // Step-specific actions
   if (n===3) E3.renderVarList();
-  if (n===4) {} // print on demand
 
   // Nav buttons
   document.getElementById('btn-prev').disabled = (n===1);
   document.getElementById('btn-next').disabled = (n===APP.totalSteps);
   document.getElementById('btn-next').textContent = n===APP.totalSteps-1 ? 'Croqui ▶' : 'Próximo ▶';
 
-  setTimeout(function(){ if(window._map) window._map.invalidateSize(); },100);
+  // Step info label
+  var labels = ['Área e Terraços','Experimentos','Variáveis','Croqui'];
+  document.getElementById('step-info').textContent = 'Etapa '+n+' de '+APP.totalSteps+' — '+labels[n-1];
+
+  setTimeout(function(){ if(window._map) window._map.invalidateSize(); }, 100);
 }
 
 function goNext() { goStep(APP.currentStep+1); }
@@ -1198,8 +1194,12 @@ function showToast(msg,cls){var t=document.getElementById('toast');t.textContent
 /* ── BOOT ───────────────────────────────────────── */
 window.addEventListener('load', function() {
   initMap();
-  E1.init();
-  E2.init();
+  // Initialize state (fresh start only — don't call after load)
+  E1.features    = [];
+  E1.areaLayers  = [];
+  E2._experiments = [];
+  E2._nextId      = 1;
+  E2._activeExp   = null;
   E3.renderVarList();
   goStep(1);
   // Auto-locate on load
@@ -1251,18 +1251,25 @@ var E1 = {
   features: [],
 
   init: function() {
-    E1.areaLayers = [];
-    E1.features   = [];
+    E2._experiments = [];
+    E2._nextId      = 1;
+    E2._activeExp   = null;
   },
 
   activate: function() {
     if (!window._map) return;
-    E1.areaLayers.forEach(function(l){ l.addTo(window._map); });
+    E2._experiments.forEach(function(exp) {
+      exp.layers.forEach(function(l){ l.addTo(window._map); });
+      if (exp.marker) exp.marker.addTo(window._map);
+    });
   },
 
   deactivate: function() {
     if (!window._map) return;
-    E1.areaLayers.forEach(function(l){ window._map.removeLayer(l); });
+    E2._experiments.forEach(function(exp) {
+      exp.layers.forEach(function(l){ window._map.removeLayer(l); });
+      if (exp.marker) window._map.removeLayer(exp.marker);
+    });
   },
 
   startTool: function(type) {
@@ -1812,6 +1819,18 @@ function polygonsOverlap(polyA, polyB) {
     if (pA[1] < pB[0] || pB[1] < pA[0]) return false; // gap found
   }
   return true;
+}
+
+function getBBoxPoly(exp) {
+  var nB = exp.delin==='NONE'?1:exp.nBlocos;
+  var W  = exp.nTrat*exp.pLarg + (exp.nTrat-1)*exp.espTrat;
+  var H  = nB*exp.pComp + (nB-1)*exp.espBlocos;
+  var deg = exp.angle*Math.PI/180;
+  return [[0,0],[W,0],[W,H],[0,H]].map(function(p){
+    var rx = p[0]*Math.cos(deg)+p[1]*Math.sin(deg);
+    var ry = -p[0]*Math.sin(deg)+p[1]*Math.cos(deg);
+    return [(exp.lng+rx/mPerLng(exp.lat))*mPerLng(exp.lat), (exp.lat+ry/MLAT)*MLAT];
+  });
 }
 
 function checkOverlaps() {
