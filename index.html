@@ -876,6 +876,74 @@ body{background:var(--bg);color:var(--txt);font-family:var(--fm);font-size:12px;
   .tab-btn{font-size:8px;padding:4px 1px}
 }
 @media print{.header,.side,.statusbar,.nav-footer{display:none!important}.app-body{display:block}.map-wrap,#map{width:100%;height:100vh}}
+
+/* ── TUTORIAL ── */
+.tut-overlay{position:fixed;inset:0;z-index:5000;pointer-events:none}
+.tut-overlay.active{pointer-events:all}
+.tut-backdrop{position:absolute;inset:0;background:rgba(0,0,0,0)}
+.tut-overlay.active .tut-backdrop{background:rgba(0,0,0,.55);transition:background .3s}
+
+.tut-box{
+  position:absolute;
+  background:var(--surf);
+  border:2px solid var(--grn);
+  border-radius:12px;
+  padding:16px 18px;
+  width:280px;
+  max-width:90vw;
+  box-shadow:0 8px 32px rgba(0,0,0,.6);
+  transition:all .3s;
+  pointer-events:all;
+}
+.tut-arrow{
+  position:absolute;
+  width:0;height:0;
+}
+/* arrow pointing UP */
+.tut-arrow-up{
+  top:-12px;left:30px;
+  border-left:10px solid transparent;
+  border-right:10px solid transparent;
+  border-bottom:12px solid var(--grn);
+}
+/* arrow pointing DOWN */
+.tut-arrow-down{
+  bottom:-12px;left:30px;
+  border-left:10px solid transparent;
+  border-right:10px solid transparent;
+  border-top:12px solid var(--grn);
+}
+/* arrow pointing LEFT */
+.tut-arrow-left{
+  left:-12px;top:20px;
+  border-top:10px solid transparent;
+  border-bottom:10px solid transparent;
+  border-right:12px solid var(--grn);
+}
+
+.tut-step{font-family:var(--fh);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:var(--grn);margin-bottom:6px}
+.tut-title{font-family:var(--fh);font-size:15px;font-weight:800;color:var(--txt);margin-bottom:8px;line-height:1.3}
+.tut-desc{font-size:12px;color:var(--mut);line-height:1.7;margin-bottom:12px}
+.tut-desc b{color:var(--txt)}
+.tut-desc .hi{color:var(--grn);font-weight:700}
+.tut-btns{display:flex;gap:8px;align-items:center}
+.tut-skip{background:none;border:none;color:var(--mut);font-family:var(--fm);font-size:10px;cursor:pointer;padding:0}
+.tut-skip:hover{color:var(--txt)}
+.tut-sp{flex:1}
+.tut-prev{background:var(--card);border:1px solid var(--bord);color:var(--txt);font-family:var(--fm);font-size:11px;padding:7px 12px;border-radius:5px;cursor:pointer}
+.tut-next{background:var(--grn);border:none;color:#07090a;font-family:var(--fh);font-size:12px;font-weight:800;padding:7px 14px;border-radius:5px;cursor:pointer}
+.tut-dots{display:flex;gap:5px;align-items:center}
+.tut-dot{width:6px;height:6px;border-radius:50%;background:var(--bord);transition:background .2s}
+.tut-dot.cur{background:var(--grn);width:18px;border-radius:3px}
+
+/* Highlight element */
+.tut-highlight{
+  position:relative;
+  z-index:4999;
+  border-radius:6px;
+  box-shadow:0 0 0 4px var(--grn), 0 0 0 8px rgba(63,185,80,.3) !important;
+  transition:box-shadow .3s;
+}
 .leaflet-tooltip{background:rgba(7,9,10,.9)!important;border:1px solid rgba(255,255,255,.15)!important;color:#fff!important;font-size:10px!important;padding:2px 6px!important;box-shadow:none!important}
 </style>
 </head>
@@ -887,6 +955,7 @@ body{background:var(--bg);color:var(--txt);font-family:var(--fm);font-size:12px;
     <div class="hsp"></div>
     <button class="icon-btn" onclick="loadProject()" title="Carregar projeto">📂</button>
     <button class="icon-btn" onclick="saveProject()" title="Salvar projeto">💾</button>
+    <button class="icon-btn" onclick="showTutAgain()" title="Ajuda / Tutorial" style="color:var(--grn);font-weight:700;font-size:14px">?</button>
   </div>
   <div class="tabs">
     <button class="tab-btn" id="tab1" onclick="goStep(1)">1. Área</button>
@@ -2033,12 +2102,195 @@ function geoLocate(silent){
 /* ══════════════════════════════════════
    BOOT
    ══════════════════════════════════════ */
+/* ══════════════════════════════════════
+   TUTORIAL
+   ══════════════════════════════════════ */
+var TUT_STEPS = [
+  {
+    title: 'Bem-vindo ao AgroLayout! 🌾',
+    desc:  'Este assistente vai te guiar na montagem do seu experimento agrícola em <b>4 etapas simples</b>.<br><br>Toque em <span class="hi">Próximo</span> para começar.',
+    target: null,
+    arrow: null,
+    pos: 'center'
+  },
+  {
+    title: '1. Demarque a Área',
+    desc:  'Na <b>Etapa 1</b>, clique em <span class="hi">🟩 Área Experimental</span> e trace o polígono da sua área no mapa de satélite.<br><br>Depois clique em <span class="hi">〰️ Terraço</span> para marcar os terraços.',
+    target: 'tc-area',
+    arrow: 'left',
+    pos: 'right'
+  },
+  {
+    title: '2. Salve a Área',
+    desc:  'Após demarcar, clique em <span class="hi">💾 Salvar GeoJSON</span> para guardar o mapeamento.<br><br>Este arquivo será usado nas próximas sessões.',
+    target: null,
+    arrow: null,
+    pos: 'center'
+  },
+  {
+    title: '3. Adicione os Experimentos',
+    desc:  'Vá para a <b>Etapa 2</b> e clique em <span class="hi">＋ Adicionar Experimento</span>.<br><br>Configure o delineamento, número de tratamentos, blocos e dimensões das parcelas.',
+    target: 'tab2',
+    arrow: 'down',
+    pos: 'below-tab'
+  },
+  {
+    title: '4. Posicione e Gire',
+    desc:  'Arraste o <b>marcador colorido</b> para posicionar o experimento dentro da área.<br><br>Use o <span class="hi">slider de rotação</span> para alinhar as parcelas com os terraços.',
+    target: null,
+    arrow: null,
+    pos: 'center'
+  },
+  {
+    title: '5. Variáveis e Croqui',
+    desc:  'Na <b>Etapa 3</b> cadastre as variáveis e exporte o <span class="hi">caderno de campo (.xlsx)</span>.<br><br>Na <b>Etapa 4</b> gere o <span class="hi">croqui para impressão</span> com a tabela de aleatorização.',
+    target: null,
+    arrow: null,
+    pos: 'center'
+  }
+];
+
+var tutIdx = 0;
+var tutOpen = false;
+
+function tutShow() {
+  var seen = localStorage.getItem('agrolayout-tut-done');
+  if (seen) return;
+  tutOpen = true;
+  tutIdx  = 0;
+  document.getElementById('tut-overlay').classList.add('active');
+  tutRender();
+}
+
+function tutClose() {
+  tutOpen = false;
+  document.getElementById('tut-overlay').classList.remove('active');
+  try { localStorage.setItem('agrolayout-tut-done','1'); } catch(e){}
+  // Remove any highlights
+  document.querySelectorAll('.tut-highlight').forEach(function(el){
+    el.classList.remove('tut-highlight');
+  });
+}
+
+function tutNext() {
+  if (tutIdx < TUT_STEPS.length - 1) {
+    tutIdx++;
+    tutRender();
+  } else {
+    tutClose();
+  }
+}
+
+function tutPrev() {
+  if (tutIdx > 0) { tutIdx--; tutRender(); }
+}
+
+function showTutAgain() {
+  try { localStorage.removeItem('agrolayout-tut-done'); } catch(e){}
+  tutOpen = true; tutIdx = 0;
+  document.getElementById('tut-overlay').classList.add('active');
+  tutRender();
+}
+
+function tutRender() {
+  var step  = TUT_STEPS[tutIdx];
+  var total = TUT_STEPS.length;
+  var box   = document.getElementById('tut-box');
+  var arrow = document.getElementById('tut-arrow');
+
+  document.getElementById('tut-step').textContent  = 'Passo ' + (tutIdx+1) + ' de ' + total;
+  document.getElementById('tut-title').textContent = step.title;
+  document.getElementById('tut-desc').innerHTML    = step.desc;
+  document.getElementById('tut-next').textContent  = tutIdx === total-1 ? '✓ Entendi!' : 'Próximo ▶';
+  document.getElementById('tut-prev').style.display = tutIdx > 0 ? '' : 'none';
+
+  // Dots
+  var dots = '';
+  for (var i=0; i<total; i++) dots += '<div class="tut-dot'+(i===tutIdx?' cur':'')+'" onclick="tutGoTo('+i+')"></div>';
+  document.getElementById('tut-dots').innerHTML = dots;
+
+  // Remove old highlights
+  document.querySelectorAll('.tut-highlight').forEach(function(el){
+    el.classList.remove('tut-highlight');
+  });
+  arrow.className = 'tut-arrow';
+
+  // Position box and highlight target
+  if (step.pos === 'center' || !step.target) {
+    box.style.top    = '50%';
+    box.style.left   = '50%';
+    box.style.transform = 'translate(-50%, -50%)';
+    box.style.bottom = '';
+    box.style.right  = '';
+    arrow.style.display = 'none';
+  } else if (step.pos === 'right' && step.target) {
+    var el = document.getElementById(step.target);
+    if (el) {
+      el.classList.add('tut-highlight');
+      var r = el.getBoundingClientRect();
+      box.style.top       = Math.max(10, r.top - 10) + 'px';
+      box.style.left      = (r.right + 16) + 'px';
+      box.style.transform = '';
+      box.style.bottom    = '';
+      box.style.right     = '';
+      arrow.style.display = '';
+      arrow.className     = 'tut-arrow tut-arrow-left';
+    }
+  } else if (step.pos === 'below-tab' && step.target) {
+    var el2 = document.getElementById(step.target);
+    if (el2) {
+      el2.classList.add('tut-highlight');
+      var r2 = el2.getBoundingClientRect();
+      box.style.top       = (r2.bottom + 16) + 'px';
+      box.style.left      = Math.min(r2.left, window.innerWidth - 300) + 'px';
+      box.style.transform = '';
+      box.style.bottom    = '';
+      box.style.right     = '';
+      arrow.style.display = '';
+      arrow.className     = 'tut-arrow tut-arrow-up';
+    }
+  }
+
+  // Keep box inside viewport
+  setTimeout(function(){
+    var br = box.getBoundingClientRect();
+    if (br.right > window.innerWidth - 10) {
+      box.style.left = Math.max(10, window.innerWidth - br.width - 10) + 'px';
+    }
+    if (br.bottom > window.innerHeight - 10) {
+      box.style.top = Math.max(10, window.innerHeight - br.height - 10) + 'px';
+    }
+  }, 10);
+}
+
+function tutGoTo(i) { tutIdx = i; tutRender(); }
+
 window.addEventListener('load',function(){
   initMap();
   goStep(1);
   geoLocate(true);
+  // Show tutorial after a short delay
+  setTimeout(tutShow, 800);
 });
 </script>
+<!-- TUTORIAL OVERLAY -->
+<div class="tut-overlay" id="tut-overlay">
+  <div class="tut-backdrop" onclick="tutNext()"></div>
+  <div class="tut-box" id="tut-box">
+    <div class="tut-arrow" id="tut-arrow"></div>
+    <div class="tut-step" id="tut-step">Passo 1 de 6</div>
+    <div class="tut-title" id="tut-title">Bem-vindo ao AgroLayout!</div>
+    <div class="tut-desc" id="tut-desc"></div>
+    <div class="tut-btns">
+      <button class="tut-skip" onclick="tutClose()">Pular tutorial</button>
+      <div class="tut-sp"></div>
+      <div class="tut-dots" id="tut-dots"></div>
+      <button class="tut-prev" id="tut-prev" onclick="tutPrev()" style="display:none">◀</button>
+      <button class="tut-next" id="tut-next" onclick="tutNext()">Começar ▶</button>
+    </div>
+  </div>
+</div>
+
 <script>
 if('serviceWorker' in navigator){
   navigator.serviceWorker.register('./sw.js',{scope:'./'})
