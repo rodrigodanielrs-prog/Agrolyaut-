@@ -1442,8 +1442,18 @@ function randomize(exp) {
 }
 
 function addExp() {
-  var c   = MAP.getCenter();
-  var exp = newExp(c.lat, c.lng);
+  // Use SW corner of demarcated area, or map center if no area
+  var pos = MAP.getCenter();
+  var areas = areaFeats.filter(function(f){ return f.type === 'area'; });
+  if (areas.length) {
+    var coords = areas[0].gj.geometry.coordinates[0];
+    // Find southernmost + westernmost point (SW corner)
+    var sw = coords.reduce(function(best, c) {
+      return (c[1] * 1000 - c[0]) < (best[1] * 1000 - best[0]) ? c : best;
+    }, coords[0]);
+    pos = L.latLng(sw[1], sw[0]);
+  }
+  var exp = newExp(pos.lat, pos.lng);
   randomize(exp);
   exps.push(exp);
   activeExp = exp.id;
