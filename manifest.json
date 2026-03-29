@@ -1,0 +1,19 @@
+{
+  "name": "AgroLayout",
+  "short_name": "AgroLayout",
+  "description": "Posicionamento de experimentos agrícolas via satélite",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#07090a",
+  "theme_color": "#3fb950",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
