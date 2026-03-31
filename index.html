@@ -847,33 +847,160 @@ body{background:var(--bg);color:var(--txt);font-family:var(--fm);font-size:12px;
 .btn-confirm{color:#07090a;font-weight:700}
 
 /* ── MOBILE ── */
-@media(max-width:700px){
+
+/* ════════════════════════════════════════
+   RESPONSIVO — todos os tamanhos de tela
+   ════════════════════════════════════════ */
+
+/* ── Desktop grande (≥1280px) ── */
+@media(min-width:1280px){
+  .side{width:320px}
+  .tab-btn{font-size:11px;padding:7px 8px}
+  .logo{font-size:20px}
+  .sec{padding:13px 16px}
+  .btn{padding:8px 12px;font-size:12px}
+}
+
+/* ── Desktop médio (1024–1279px) ── */
+@media(min-width:1024px) and (max-width:1279px){
+  .side{width:290px}
+  .tab-btn{font-size:10px;padding:6px 5px}
+}
+
+/* ── Tablet landscape (768–1023px) ── */
+@media(min-width:768px) and (max-width:1023px){
+  .side{width:260px}
+  .tab-btn{font-size:10px;padding:6px 3px}
+  .logo{font-size:16px}
+  .sec{padding:11px 13px}
+}
+
+/* ── Tablet portrait (600–767px) ── */
+@media(min-width:600px) and (max-width:767px){
   .app-body{flex-direction:column}
   .side{
     width:100%;
-    height:auto;
+    max-height:44vh;
+    border-right:none;
+    border-bottom:1px solid var(--bord);
+    flex-shrink:0;
+  }
+  .side-scroll{overflow-y:auto;-webkit-overflow-scrolling:touch}
+  .map-wrap{flex:1;min-height:0}
+  .logo{font-size:16px}
+  .tab-btn{font-size:10px;padding:6px 4px}
+  .nav-btn{padding:8px 14px;font-size:11px}
+  .sec{padding:10px 12px}
+  .btn{padding:7px 10px;margin-bottom:4px}
+  /* Bigger touch targets */
+  .tool-card{padding:11px 12px;margin-bottom:7px}
+  .tc-name{font-size:13px}
+}
+
+/* ── Smartphone landscape (qualquer altura <420px) ── */
+@media(max-width:767px) and (orientation:landscape){
+  .app-body{flex-direction:row}
+  .side{
+    width:220px;
+    max-height:none;
+    border-right:1px solid var(--bord);
+    border-bottom:none;
+    flex-shrink:0;
+  }
+  .tab-btn{font-size:8px;padding:4px 2px}
+  .logo{font-size:14px}
+  .hdr-r1{gap:5px}
+  .icon-btn{width:26px;height:26px;font-size:12px}
+  .nav-btn{padding:6px 10px;font-size:10px}
+  .nav-footer{padding:5px 8px}
+  .statusbar{height:20px;font-size:9px}
+  .sec{padding:6px 10px}
+  .btn{padding:5px 8px;font-size:10px;margin-bottom:2px}
+  .sec-t{font-size:9px;margin-bottom:5px}
+}
+
+/* ── Smartphone portrait (430–599px) ── */
+@media(min-width:431px) and (max-width:599px){
+  .app-body{flex-direction:column}
+  .side{
+    width:100%;
+    max-height:40vh;
+    border-right:none;
+    border-bottom:1px solid var(--bord);
+    flex-shrink:0;
+  }
+  .side-scroll{overflow-y:auto;-webkit-overflow-scrolling:touch}
+  .map-wrap{flex:1;min-height:0}
+  .logo{font-size:16px}
+  .tab-btn{font-size:9px;padding:5px 3px}
+  .nav-btn{padding:7px 12px;font-size:11px}
+  .sec{padding:9px 11px}
+  .btn{padding:7px 10px;margin-bottom:3px}
+  /* Touch targets */
+  .tool-card{padding:10px 11px}
+  .tc-name{font-size:13px}
+  .ep-inp,.ep-f select{padding:7px 8px;font-size:12px}
+  input[type=range]{height:28px}
+  .trat-inp{padding:6px 7px;font-size:12px}
+  .del-btn{font-size:14px;padding:0 4px}
+}
+
+/* ── Smartphone pequeno (≤430px) ── */
+@media(max-width:430px){
+  .app-body{flex-direction:column}
+  .side{
+    width:100%;
     max-height:38vh;
     border-right:none;
     border-bottom:1px solid var(--bord);
     flex-shrink:0;
   }
-  .side-scroll{
-    overflow-y:auto;
-    -webkit-overflow-scrolling:touch;
-  }
+  .side-scroll{overflow-y:auto;-webkit-overflow-scrolling:touch}
   .map-wrap{flex:1;min-height:0}
-  .logo{font-size:16px}
-  .tab-btn{font-size:9px;padding:5px 2px}
-  .nav-btn{padding:7px 12px;font-size:11px}
-  /* Make buttons always visible by keeping sec compact */
-  .sec{padding:8px 10px}
-  .btn{padding:6px 10px;margin-bottom:3px}
-  .zoom-ctrl{padding:6px 10px}
+  /* Header compacto */
+  .hdr{padding:6px 10px;gap:5px}
+  .hdr-r1{gap:5px}
+  .logo{font-size:15px}
+  .tabs{gap:3px}
+  .tab-btn{font-size:8px;padding:5px 2px;border-radius:5px}
+  .icon-btn{width:28px;height:28px;font-size:13px}
+  /* Nav footer */
+  .nav-footer{padding:6px 10px;gap:6px}
+  .nav-btn{padding:7px 10px;font-size:10px}
+  /* Sections */
+  .sec{padding:7px 10px}
+  .sec-t{font-size:9px;margin-bottom:6px}
+  /* Buttons — grandes para campo */
+  .btn{padding:9px 10px;font-size:11px;margin-bottom:4px}
+  /* Tool cards */
+  .tool-card{padding:10px 10px;margin-bottom:6px}
+  .tc-name{font-size:13px}
+  .tc-sub{font-size:10px}
+  /* Inputs maiores para campo */
+  .ep-inp,.ep-f select,.trat-inp{padding:8px 8px;font-size:13px}
+  input[type=range]{height:32px}
+  /* Grids em coluna única */
+  .ep-g2{grid-template-columns:1fr}
+  .zoom-presets{grid-template-columns:1fr 1fr}
+  /* Listas */
+  .feat-item,.exp-item{padding:8px 9px}
+  .feat-name,.exp-name{font-size:12px}
+  .del-btn{font-size:15px;padding:0 5px}
+  /* Modal fullscreen */
+  .mbox{width:95vw;padding:16px}
+  .mbox input{padding:10px 9px;font-size:13px}
+  .mbtns button{padding:10px}
+  /* Status */
+  .statusbar{font-size:9px}
+  #s-coord{display:none}
 }
-/* Extra small phones */
-@media(max-width:380px){
-  .side{max-height:35vh}
-  .tab-btn{font-size:8px;padding:4px 1px}
+
+/* ── Tela muito pequena (≤320px — iPhone SE 1ª geração) ── */
+@media(max-width:320px){
+  .side{max-height:34vh}
+  .tab-btn{font-size:7px;padding:4px 1px}
+  .logo{font-size:13px}
+  .btn{font-size:10px;padding:8px 8px}
 }
 @media print{.header,.side,.statusbar,.nav-footer{display:none!important}.app-body{display:block}.map-wrap,#map{width:100%;height:100vh}}
 
@@ -926,6 +1053,7 @@ body{background:var(--bg);color:var(--txt);font-family:var(--fm);font-size:12px;
 .tut-desc{font-size:12px;color:var(--mut);line-height:1.7;margin-bottom:12px}
 .tut-desc b{color:var(--txt)}
 .tut-desc .hi{color:var(--grn);font-weight:700}
+.tut-check{margin-bottom:10px;padding-top:8px;border-top:1px solid var(--bord)}
 .tut-btns{display:flex;gap:8px;align-items:center}
 .tut-skip{background:none;border:none;color:var(--mut);font-family:var(--fm);font-size:10px;cursor:pointer;padding:0}
 .tut-skip:hover{color:var(--txt)}
@@ -2179,8 +2307,10 @@ var tutIdx = 0;
 var tutOpen = false;
 
 function tutShow() {
-  var seen = localStorage.getItem('agrolayout-tut-done');
-  if (seen) return;
+  try {
+    if (localStorage.getItem('agrolayout-tut-never')) return;
+    if (localStorage.getItem('agrolayout-tut-done')) return;
+  } catch(e){}
   tutOpen = true;
   tutIdx  = 0;
   document.getElementById('tut-overlay').classList.add('active');
@@ -2196,8 +2326,16 @@ function tutClose() {
   document.querySelectorAll('.tut-highlight').forEach(function(el){
     el.classList.remove('tut-highlight');
   });
-  // Return to step 1 after tutorial
   goStep(1);
+}
+
+function tutSkip() {
+  // Check if user wants to never see again
+  var noShow = document.getElementById('tut-no-show');
+  if (noShow && noShow.checked) {
+    try { localStorage.setItem('agrolayout-tut-never','1'); } catch(e){}
+  }
+  tutClose();
 }
 
 function tutNext() {
@@ -2214,11 +2352,17 @@ function tutPrev() {
 }
 
 function showTutAgain() {
-  try { localStorage.removeItem('agrolayout-tut-done'); } catch(e){}
+  try {
+    localStorage.removeItem('agrolayout-tut-done');
+    localStorage.removeItem('agrolayout-tut-never');
+  } catch(e){}
   tutOpen = true; tutIdx = 0;
   var overlay = document.getElementById('tut-overlay');
   overlay.style.display = '';
   overlay.classList.add('active');
+  // Uncheck the "never show" checkbox
+  var cb = document.getElementById('tut-no-show');
+  if (cb) cb.checked = false;
   tutRender();
 }
 
@@ -2239,6 +2383,11 @@ function tutRender() {
   document.getElementById('tut-title').textContent = step.title;
   document.getElementById('tut-desc').innerHTML    = step.desc;
   document.getElementById('tut-next').textContent  = tutIdx === total-1 ? '✓ Entendi!' : 'Próximo ▶';
+  if (tutIdx === total-1) {
+    document.getElementById('tut-next').onclick = tutSkip;
+  } else {
+    document.getElementById('tut-next').onclick = tutNext;
+  }
   document.getElementById('tut-prev').style.display = tutIdx > 0 ? '' : 'none';
 
   // Dots
@@ -2324,8 +2473,14 @@ window.addEventListener('load',function(){
     <div class="tut-step" id="tut-step">Passo 1 de 6</div>
     <div class="tut-title" id="tut-title">Bem-vindo ao AgroLayout!</div>
     <div class="tut-desc" id="tut-desc"></div>
+    <div class="tut-check">
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:11px;color:var(--mut)">
+        <input type="checkbox" id="tut-no-show" style="width:15px;height:15px;accent-color:var(--grn);cursor:pointer">
+        Não mostrar novamente
+      </label>
+    </div>
     <div class="tut-btns">
-      <button class="tut-skip" onclick="tutClose()">Pular tutorial</button>
+      <button class="tut-skip" onclick="tutSkip()">Pular</button>
       <div class="tut-sp"></div>
       <div class="tut-dots" id="tut-dots"></div>
       <button class="tut-prev" id="tut-prev" onclick="tutPrev()" style="display:none">◀</button>
