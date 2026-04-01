@@ -2453,64 +2453,21 @@ function tutPositionBox(step, box, arrow) {
   document.querySelectorAll('.tut-highlight').forEach(function(el){
     el.classList.remove('tut-highlight');
   });
-  arrow.className = 'tut-arrow';
+  arrow.style.display = 'none';
 
-  // Position box and highlight target
-  var vw = window.innerWidth;
-  var vh = window.innerHeight;
-
-  // Always center on mobile (< 500px)
-  if (vw < 500 || step.pos === 'center' || !step.target) {
-    box.style.top       = '50%';
-    box.style.left      = '50%';
-    box.style.transform = 'translate(-50%, -50%)';
-    arrow.style.display = 'none';
-
-  } else if (step.pos === 'right' && step.target) {
+  // Highlight target element if any
+  if (step.target) {
     var el = document.getElementById(step.target);
-    if (el) {
-      el.classList.add('tut-highlight');
-      var r = el.getBoundingClientRect();
-      var boxW = Math.min(300, vw * 0.92);
-      var leftPos = r.right + 16;
-      // If doesn't fit on right, show below
-      if (leftPos + boxW > vw - 10) {
-        box.style.top       = Math.min(r.bottom + 12, vh * 0.3) + 'px';
-        box.style.left      = Math.max(10, (vw - boxW) / 2) + 'px';
-        box.style.transform = '';
-        arrow.style.display = 'none';
-      } else {
-        box.style.top       = Math.max(10, Math.min(r.top - 10, vh - 300)) + 'px';
-        box.style.left      = leftPos + 'px';
-        box.style.transform = '';
-        arrow.style.display = '';
-        arrow.className     = 'tut-arrow tut-arrow-left';
-      }
-    }
-
-  } else if (step.pos === 'below-tab' && step.target) {
-    var el2 = document.getElementById(step.target);
-    if (el2) {
-      el2.classList.add('tut-highlight');
-      var r2 = el2.getBoundingClientRect();
-      var boxW2 = Math.min(300, vw * 0.92);
-      box.style.top       = (r2.bottom + 12) + 'px';
-      box.style.left      = Math.max(10, Math.min(r2.left, vw - boxW2 - 10)) + 'px';
-      box.style.transform = '';
-      arrow.style.display = '';
-      arrow.className     = 'tut-arrow tut-arrow-up';
-    }
+    if (el) el.classList.add('tut-highlight');
   }
 
-  // Clamp to viewport
-  setTimeout(function(){
-    var br = box.getBoundingClientRect();
-    if (br.right  > vw - 8)  box.style.left = Math.max(8, vw  - br.width  - 8) + 'px';
-    if (br.bottom > vh - 8)  box.style.top  = Math.max(8, vh  - br.height - 8) + 'px';
-    if (br.left   < 8)       box.style.left = '8px';
-    if (br.top    < 8)       box.style.top  = '8px';
-  }, 50);
+  // Always center - works on all screen sizes
+  box.style.position  = 'fixed';
+  box.style.top       = '50%';
+  box.style.left      = '50%';
+  box.style.transform = 'translate(-50%, -50%)';
 }
+
 
 function tutGoTo(i) { tutIdx = i; tutRender(); }
 
