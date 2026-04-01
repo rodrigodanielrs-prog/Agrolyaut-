@@ -1011,16 +1011,21 @@ body{background:var(--bg);color:var(--txt);font-family:var(--fm);font-size:12px;
 .tut-overlay.active .tut-backdrop{background:rgba(0,0,0,.55);transition:background .3s}
 
 .tut-box{
-  position:absolute;
+  position:fixed;
   background:var(--surf);
   border:2px solid var(--grn);
   border-radius:12px;
   padding:16px 18px;
-  width:280px;
-  max-width:90vw;
+  width:min(300px, 92vw);
+  max-height:90vh;
+  overflow-y:auto;
   box-shadow:0 8px 32px rgba(0,0,0,.6);
-  transition:all .3s;
+  transition:top .3s,left .3s;
   pointer-events:all;
+  /* Default: centered */
+  top:50%;
+  left:50%;
+  transform:translate(-50%,-50%);
 }
 .tut-arrow{
   position:absolute;
@@ -1054,6 +1059,14 @@ body{background:var(--bg);color:var(--txt);font-family:var(--fm);font-size:12px;
 .tut-desc b{color:var(--txt)}
 .tut-desc .hi{color:var(--grn);font-weight:700}
 .tut-check{margin-bottom:10px;padding-top:8px;border-top:1px solid var(--bord)}
+@media(max-width:500px){
+  .tut-box{padding:14px 14px;border-radius:10px}
+  .tut-title{font-size:14px}
+  .tut-desc{font-size:11px;line-height:1.6}
+  .tut-next{padding:8px 14px;font-size:12px}
+  .tut-prev{padding:8px 10px}
+  .tut-step{font-size:9px}
+}
 .tut-btns{display:flex;gap:8px;align-items:center}
 .tut-skip{background:none;border:none;color:var(--mut);font-family:var(--fm);font-size:10px;cursor:pointer;padding:0}
 .tut-skip:hover{color:var(--txt)}
@@ -1150,6 +1163,23 @@ body{background:var(--bg);color:var(--txt);font-family:var(--fm);font-size:12px;
       <div id="exp-panel">
         <div class="empty" style="padding:20px;text-align:center">Adicione ou selecione um experimento</div>
       </div>
+      <!-- Offline cache -->
+      <div class="sec">
+        <div class="sec-t">Modo Offline 📶</div>
+        <p style="font-size:11px;color:var(--mut);margin-bottom:8px;line-height:1.6">
+          Baixa as imagens de satélite da área demarcada para usar <b>sem internet</b> no campo.
+        </p>
+        <button class="btn btn-ghost" onclick="cacheTiles()" id="cache-btn-txt" style="width:100%">
+          ⬇ Baixar satélite para offline
+        </button>
+        <div id="cache-status" style="display:none;margin-top:8px">
+          <div style="background:var(--bord);border-radius:4px;height:6px;overflow:hidden;margin-bottom:4px">
+            <div id="cache-bar" style="background:var(--grn);height:100%;width:0%;transition:width .2s;border-radius:4px"></div>
+          </div>
+          <div id="cache-lbl" style="font-size:10px;color:var(--mut);text-align:center">0 / 0 tiles</div>
+        </div>
+      </div>
+
       <div class="zoom-ctrl">
         <div class="sec-title">Zoom do Mapa</div>
         <div class="zoom-row">
@@ -1218,7 +1248,18 @@ body{background:var(--bg);color:var(--txt);font-family:var(--fm);font-size:12px;
   <div class="map-wrap">
     <div id="map"></div>
     <div id="mbub">📏 <b id="mbub-dist">0 m</b> · duplo-clique para finalizar</div>
-    <button class="geo-btn" onclick="geoLocate(false)" title="Minha localização">📍</button>
+    <button class="geo-btn" onclick="geoLocate(false)" title="Minha localização" style="bottom:100px">📍</button>
+    <button class="geo-btn" id="compass-btn" onclick="startCompass()" title="Bússola" style="bottom:145px">🧭</button>
+
+    <!-- Compass display -->
+    <div id="compass-display" style="display:none;position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:700;background:rgba(7,9,10,.92);border:1px solid var(--grn);border-radius:8px;padding:8px 14px;align-items:center;gap:10px;white-space:nowrap">
+      <div id="compass-arrow" style="font-size:22px;transition:transform .3s">🧭</div>
+      <div>
+        <div id="compass-deg" style="font-family:monospace;font-size:13px;font-weight:700;color:var(--grn)">0°</div>
+        <div id="compass-b1" style="font-size:10px;color:var(--yel)">Selecione um experimento</div>
+      </div>
+      <button onclick="stopCompass()" style="background:none;border:1px solid var(--mut);color:var(--mut);border-radius:4px;padding:2px 7px;cursor:pointer;font-size:10px">✕</button>
+    </div>
   </div>
 
 </div>
@@ -2410,52 +2451,177 @@ function tutPositionBox(step, box, arrow) {
   arrow.className = 'tut-arrow';
 
   // Position box and highlight target
-  if (step.pos === 'center' || !step.target) {
+  var vw = window.innerWidth;
+  var vh = window.innerHeight;
+
+  // Always center on mobile (< 500px)
+  if (vw < 500 || step.pos === 'center' || !step.target) {
     box.style.top       = '50%';
     box.style.left      = '50%';
     box.style.transform = 'translate(-50%, -50%)';
-    box.style.bottom    = '';
-    box.style.right     = '';
     arrow.style.display = 'none';
+
   } else if (step.pos === 'right' && step.target) {
     var el = document.getElementById(step.target);
     if (el) {
       el.classList.add('tut-highlight');
       var r = el.getBoundingClientRect();
-      box.style.top       = Math.max(10, r.top - 10) + 'px';
-      box.style.left      = (r.right + 16) + 'px';
-      box.style.transform = '';
-      box.style.bottom    = '';
-      box.style.right     = '';
-      arrow.style.display = '';
-      arrow.className     = 'tut-arrow tut-arrow-left';
+      var boxW = Math.min(300, vw * 0.92);
+      var leftPos = r.right + 16;
+      // If doesn't fit on right, show below
+      if (leftPos + boxW > vw - 10) {
+        box.style.top       = Math.min(r.bottom + 12, vh * 0.3) + 'px';
+        box.style.left      = Math.max(10, (vw - boxW) / 2) + 'px';
+        box.style.transform = '';
+        arrow.style.display = 'none';
+      } else {
+        box.style.top       = Math.max(10, Math.min(r.top - 10, vh - 300)) + 'px';
+        box.style.left      = leftPos + 'px';
+        box.style.transform = '';
+        arrow.style.display = '';
+        arrow.className     = 'tut-arrow tut-arrow-left';
+      }
     }
+
   } else if (step.pos === 'below-tab' && step.target) {
     var el2 = document.getElementById(step.target);
     if (el2) {
       el2.classList.add('tut-highlight');
       var r2 = el2.getBoundingClientRect();
-      box.style.top       = (r2.bottom + 16) + 'px';
-      box.style.left      = Math.min(r2.left, window.innerWidth - 300) + 'px';
+      var boxW2 = Math.min(300, vw * 0.92);
+      box.style.top       = (r2.bottom + 12) + 'px';
+      box.style.left      = Math.max(10, Math.min(r2.left, vw - boxW2 - 10)) + 'px';
       box.style.transform = '';
-      box.style.bottom    = '';
-      box.style.right     = '';
       arrow.style.display = '';
       arrow.className     = 'tut-arrow tut-arrow-up';
     }
   }
 
-  // Keep box inside viewport
+  // Clamp to viewport
   setTimeout(function(){
     var br = box.getBoundingClientRect();
-    if (br.right > window.innerWidth - 10)
-      box.style.left = Math.max(10, window.innerWidth - br.width - 10) + 'px';
-    if (br.bottom > window.innerHeight - 10)
-      box.style.top  = Math.max(10, window.innerHeight - br.height - 10) + 'px';
+    if (br.right  > vw - 8)  box.style.left = Math.max(8, vw  - br.width  - 8) + 'px';
+    if (br.bottom > vh - 8)  box.style.top  = Math.max(8, vh  - br.height - 8) + 'px';
+    if (br.left   < 8)       box.style.left = '8px';
+    if (br.top    < 8)       box.style.top  = '8px';
   }, 50);
 }
 
 function tutGoTo(i) { tutIdx = i; tutRender(); }
+
+
+/* ══════════════════════════════════════
+   MODO OFFLINE — PRÉ-CACHE DE TILES
+   ══════════════════════════════════════ */
+function deg2tile(lat, lng, z) {
+  var n = Math.pow(2, z);
+  var x = Math.floor((lng + 180) / 360 * n);
+  var latR = lat * Math.PI / 180;
+  var y = Math.floor((1 - Math.log(Math.tan(latR) + 1/Math.cos(latR)) / Math.PI) / 2 * n);
+  return {x:x, y:y};
+}
+
+function cacheTiles() {
+  var areas = areaFeats.filter(function(f){ return f.type==='area'; });
+  var lats=[], lngs=[];
+  if (areas.length) {
+    areas[0].gj.geometry.coordinates[0].forEach(function(c){ lngs.push(c[0]); lats.push(c[1]); });
+  } else if (areaLayers.length) {
+    try { var b=L.featureGroup(areaLayers.filter(function(l){return l.getBounds;})).getBounds(); lats=[b.getSouth(),b.getNorth()]; lngs=[b.getWest(),b.getEast()]; }
+    catch(e) { toast('Demarque a área primeiro (Etapa 1)','ty'); return; }
+  } else { toast('Demarque a área primeiro (Etapa 1)','ty'); return; }
+
+  var minLat=Math.min.apply(null,lats), maxLat=Math.max.apply(null,lats);
+  var minLng=Math.min.apply(null,lngs), maxLng=Math.max.apply(null,lngs);
+  var urls=[];
+  for (var z=15; z<=21; z++) {
+    var tMin=deg2tile(maxLat,minLng,z), tMax=deg2tile(minLat,maxLng,z);
+    for (var x=tMin.x; x<=tMax.x; x++) {
+      for (var y=tMin.y; y<=tMax.y; y++) {
+        urls.push('https://mt0.google.com/vt/lyrs=s&x='+x+'&y='+y+'&z='+z);
+        urls.push('https://mt1.google.com/vt/lyrs=s&x='+x+'&y='+y+'&z='+z);
+      }
+    }
+  }
+  if (urls.length > 600) { toast('Área muito grande ('+urls.length+' tiles). Demarque uma área menor.','ty'); return; }
+
+  setSt('Baixando '+urls.length+' tiles para offline…', true);
+  document.getElementById('cache-status').style.display='block';
+  var done=0, failed=0;
+  Promise.all(urls.map(function(url){
+    return fetch(url,{mode:'no-cors'})
+      .then(function(){ done++; updCache(done+failed,urls.length); })
+      .catch(function(){ failed++; updCache(done+failed,urls.length); });
+  })).then(function(){
+    var msg='✓ '+done+' tiles em cache'+(failed?' ('+failed+' falhas)':'');
+    setSt(msg,true); toast(msg,failed>done?'tr':'');
+    document.getElementById('cache-btn-txt').textContent='✓ Offline pronto';
+    setTimeout(function(){document.getElementById('cache-status').style.display='none';},3000);
+  });
+}
+
+function updCache(done,total){
+  var pct=Math.round(done/total*100);
+  var bar=document.getElementById('cache-bar');
+  var lbl=document.getElementById('cache-lbl');
+  if(bar) bar.style.width=pct+'%';
+  if(lbl) lbl.textContent=done+' / '+total+' ('+pct+'%)';
+}
+
+/* ══════════════════════════════════════
+   BÚSSOLA / ORIENTAÇÃO
+   ══════════════════════════════════════ */
+var _compassActive=false, _compassMarker=null, _compassHeading=0;
+
+function startCompass(){
+  if(_compassActive){stopCompass();return;}
+  if(typeof DeviceOrientationEvent!=='undefined' && typeof DeviceOrientationEvent.requestPermission==='function'){
+    DeviceOrientationEvent.requestPermission()
+      .then(function(p){ if(p==='granted') enableCompass(); else toast('Permissão negada','ty'); })
+      .catch(function(){ toast('Bússola indisponível','ty'); });
+  } else if(window.DeviceOrientationEvent){
+    enableCompass();
+  } else { toast('Bússola não disponível neste dispositivo','ty'); }
+}
+
+function enableCompass(){
+  _compassActive=true;
+  var btn=document.getElementById('compass-btn');
+  if(btn){btn.style.background='var(--grn)';btn.style.color='#07090a';}
+  window.addEventListener('deviceorientation',onOrientation,true);
+  document.getElementById('compass-display').style.display='flex';
+  toast('🧭 Bússola ativada','');
+}
+
+function stopCompass(){
+  _compassActive=false;
+  var btn=document.getElementById('compass-btn');
+  if(btn){btn.style.background='var(--surf)';btn.style.color='var(--grn)';}
+  window.removeEventListener('deviceorientation',onOrientation,true);
+  if(_compassMarker){MAP.removeLayer(_compassMarker);_compassMarker=null;}
+  document.getElementById('compass-display').style.display='none';
+}
+
+function onOrientation(e){
+  var h=null;
+  if(e.webkitCompassHeading!=null) h=e.webkitCompassHeading;
+  else if(e.alpha!=null) h=(360-e.alpha)%360;
+  if(h===null) return;
+  _compassHeading=h;
+  var arrow=document.getElementById('compass-arrow');
+  var deg=document.getElementById('compass-deg');
+  if(arrow) arrow.style.transform='rotate('+h+'deg)';
+  if(deg)   deg.textContent=Math.round(h)+'°';
+  // Direction to Bloco 1
+  var exp=exps.find(function(e){return e.id===activeExp;});
+  var b1lbl=document.getElementById('compass-b1');
+  if(exp && b1lbl){
+    var diff=((exp.angle%360+360)%360)-h;
+    while(diff>180) diff-=360; while(diff<-180) diff+=360;
+    var abs=Math.abs(diff);
+    b1lbl.textContent = abs<20?'↑ Bloco 1 à frente':abs>160?'↓ Bloco 1 atrás':diff>0?'→ Direita '+Math.round(abs)+'°':'← Esquerda '+Math.round(abs)+'°';
+  }
+}
 
 window.addEventListener('load',function(){
   initMap();
