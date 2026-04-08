@@ -1,7 +1,8 @@
 {
   "name": "AgroLayout",
   "short_name": "AgroLayout",
-  "description": "Posicionamento de experimentos agrícolas via satélite",
+  "id": "br.edu.setrem.agrolayout",
+  "description": "Posicionamento de experimentos agrícolas via satélite - SETREM Agronomia",
   "start_url": "https://rodrigodanielrs-prog.github.io/Agrolyaut-/index.html",
   "scope": "https://rodrigodanielrs-prog.github.io/Agrolyaut-/",
   "display": "standalone",
@@ -9,6 +10,12 @@
   "theme_color": "#3fb950",
   "orientation": "any",
   "lang": "pt-BR",
+  "dir": "ltr",
+  "categories": [
+    "education",
+    "productivity",
+    "utilities"
+  ],
   "icons": [
     {
       "src": "icon-192-any.png",
@@ -33,6 +40,28 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "icon-512-any.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "AgroLayout - Mapeamento de experimentos"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Nova Área",
+      "short_name": "Área",
+      "url": "https://rodrigodanielrs-prog.github.io/Agrolyaut-/index.html",
+      "icons": [
+        {
+          "src": "icon-192-any.png",
+          "sizes": "192x192"
+        }
+      ]
     }
   ]
 }
