@@ -2,17 +2,24 @@
   "name": "AgroLayout",
   "short_name": "AgroLayout",
   "description": "Posicionamento de experimentos agrícolas via satélite",
-  "start_url": "./index.html",
-  "scope": "./",
+  "start_url": "https://rodrigodanielrs-prog.github.io/Agrolyaut-/index.html",
+  "scope": "https://rodrigodanielrs-prog.github.io/Agrolyaut-/",
   "display": "standalone",
   "background_color": "#07090a",
   "theme_color": "#3fb950",
   "orientation": "any",
+  "lang": "pt-BR",
   "icons": [
     {
-      "src": "icon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
       "purpose": "any maskable"
     }
   ]
