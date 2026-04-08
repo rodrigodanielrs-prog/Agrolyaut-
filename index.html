@@ -1679,12 +1679,12 @@ function newExp(lat,lng) {
   return {
     id:id, name:'Experimento '+id, color:color,
     lat:lat, lng:lng, angle:window._autoAngle||0,
-    delin:'DBC', nTrat:8, nBlocos:4,
-    nLinhas:5, espLinhas:0.17,
-    pLarg:0.85, pComp:5.0,
+    delin:'DBC', nTrat:2, nBlocos:2,
+    nLinhas:1, espLinhas:0.17,
+    pLarg:0.17, pComp:5.0,
     espTrat:0.0, espBlocos:1.0,
     bloco1Fixed:false, visible:true,
-    tratNames:Array.from({length:16},function(_,i){return 'T'+(i+1);}),
+    tratNames:Array.from({length:30},function(_,i){return 'T'+(i+1);}),
     allocs:null, layers:[], marker:null, _gj:null
   };
 }
@@ -2042,15 +2042,8 @@ function checkOverlap(){
 /* ══════════════════════════════════════
    ETAPA 3 — VARIÁVEIS
    ══════════════════════════════════════ */
-var vars = [
-  {id:1,name:'Estatura de plantas',unit:'cm',  sub:10,tipo:'sub'},
-  {id:2,name:'MMG',                 unit:'g',   sub:8, tipo:'sub'},
-  {id:3,name:'Acamamento',          unit:'%',   sub:1, tipo:'uni'},
-  {id:4,name:'Produtividade',       unit:'kg/ha',sub:1,tipo:'uni'},
-  {id:5,name:'Ciclo',               unit:'dias', sub:1,tipo:'uni'},
-  {id:6,name:'N° plantas/parcela',  unit:'pl',   sub:1,tipo:'uni'}
-];
-var nextVarId=7;
+var vars = [];
+var nextVarId = 1;
 
 function renderVars(){
   var el=document.getElementById('var-list');
