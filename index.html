@@ -1002,6 +1002,26 @@ body{background:var(--bg);color:var(--txt);font-family:var(--fm);font-size:12px;
   .logo{font-size:13px}
   .btn{font-size:10px;padding:8px 8px}
 }
+
+/* ── HISTÓRICO ── */
+.hist-safra-hd{font-family:'Syne',sans-serif;font-size:10px;font-weight:700;
+  text-transform:uppercase;letter-spacing:1.2px;color:var(--grn);
+  padding:8px 12px 4px;margin-top:4px}
+.hist-safra-hd span{color:var(--mut);font-weight:400}
+.hist-item{display:flex;align-items:flex-start;gap:8px;padding:8px 10px;
+  margin:0 8px 4px;border-radius:6px;background:var(--card);border:1px solid var(--bord)}
+.hist-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;margin-top:3px}
+.hist-info{flex:1;min-width:0}
+.hist-nome{font-family:'Syne',sans-serif;font-size:12px;font-weight:700;color:var(--txt)}
+.hist-meta{font-size:10px;color:var(--mut);margin-top:1px}
+.hist-coords{font-size:9px;color:var(--bord);margin-top:2px;font-family:monospace}
+.hist-acts{display:flex;flex-direction:column;gap:3px;flex-shrink:0}
+.hist-reg-form{padding:10px 12px;border-bottom:1px solid var(--bord)}
+.hist-reg-form input{width:100%;background:var(--card);border:1px solid var(--bord);
+  color:var(--txt);font-family:'Space Mono',monospace;font-size:11px;
+  padding:6px 8px;border-radius:4px;outline:none;margin-bottom:5px}
+.hist-reg-form input:focus{border-color:var(--grn)}
+
 @media print{.header,.side,.statusbar,.nav-footer{display:none!important}.app-body{display:block}.map-wrap,#map{width:100%;height:100vh}}
 
 /* ── TUTORIAL ── */
@@ -1104,6 +1124,7 @@ body{background:var(--bg);color:var(--txt);font-family:var(--fm);font-size:12px;
     <button class="tab-btn" id="tab2" onclick="goStep(2)">2. Experimentos</button>
     <button class="tab-btn" id="tab3" onclick="goStep(3)">3. Variáveis</button>
     <button class="tab-btn" id="tab4" onclick="goStep(4)">4. Croqui</button>
+    <button class="tab-btn" id="tab5" onclick="goStep(5)">5. Histórico</button>
   </div>
 </div>
 
@@ -1224,7 +1245,7 @@ body{background:var(--bg);color:var(--txt);font-family:var(--fm);font-size:12px;
       <div class="sec">
         <div class="sec-title">Caderno de Campo</div>
         <p style="font-size:11px;color:var(--mut);margin-bottom:8px;line-height:1.6">Planilha Excel com uma linha por parcela e colunas para cada variável.</p>
-        <button class="btn btn-grn" onclick="exportXLSX()">📊 Baixar Planilha (.xlsx)</button>
+        <button class="btn btn-grn" onclick="abrirCadernoModal()">📊 Baixar Planilha (.xlsx)</button>
       </div>
     </div>
   </div>
@@ -1238,9 +1259,33 @@ body{background:var(--bg);color:var(--txt);font-family:var(--fm);font-size:12px;
         <button class="btn btn-grn" onclick="printCroqui()">🖨 Gerar Croqui (PDF)</button>
       </div>
       <div class="sec">
-        <div class="sec-title">Exportar Dados</div>
+        <div class="sec-title">Exportar Experimentos</div>
+        <p style="font-size:11px;color:var(--mut);margin-bottom:8px;line-height:1.6">
+          Exporta as parcelas posicionadas no mapa.
+        </p>
+        <button class="btn btn-ghost" onclick="exportGeoJSONExps()">🗺 GeoJSON (parcelas)</button>
         <button class="btn btn-ghost" onclick="exportKMLExps()">🌐 KML (Google Earth)</button>
-        <button class="btn btn-ghost" onclick="exportCSV()">📄 GPS CSV</button>
+        <button class="btn btn-ghost" onclick="exportCSV()">📄 CSV com coordenadas GPS</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ P5: HISTÓRICO ══ -->
+  <div id="p5" class="side" style="display:none">
+    <div class="side-sc">
+      <div class="hist-reg-form">
+        <div class="sec-t">Registrar Ensaio Atual</div>
+        <input type="text" id="hist-safra"   placeholder="Safra (ex: 2025/26)">
+        <input type="text" id="hist-cultura" placeholder="Cultura (ex: Aveia)">
+        <input type="text" id="hist-local"   placeholder="Local (ex: SETREM — Três de Maio)">
+        <button class="btn btn-grn" onclick="histAddCurrent()">📌 Registrar no histórico</button>
+        <button class="btn btn-ghost" onclick="histShowAllMap()">🗺 Ver todos no mapa</button>
+        <button class="btn btn-ghost" onclick="histExport()">📄 Exportar CSV</button>
+        <button class="btn btn-ghost" onclick="histClear()" style="color:var(--red)">🗑 Limpar histórico</button>
+      </div>
+      <div class="sec">
+        <div class="sec-t">Ensaios Registrados</div>
+        <div id="hist-list"><div class="empty">Nenhum ensaio registrado ainda</div></div>
       </div>
     </div>
   </div>
@@ -1443,7 +1488,7 @@ function goStep(n) {
   document.getElementById('btn-prev').disabled = (n===1);
   document.getElementById('btn-next').disabled = (n===4);
   // Update nav info label
-  var labels = ['Área e Terraços','Experimentos','Variáveis','Croqui'];
+  var labels = ['Área e Terraços','Experimentos','Variáveis','Croqui','Histórico'];
   var ni = document.getElementById('nav-info');
   if (ni) ni.textContent = 'Etapa ' + n + ' de 4 — ' + labels[n-1];
   // Cancel draw if leaving E1
@@ -1588,7 +1633,10 @@ function renderE1Summary() {
   sec.style.display='block';
   var m2=0;
   areas.forEach(function(f){
-    var lls=f.layer.getLatLngs()[0]; if(!lls||lls.length<3) return;
+    var lls=null;
+    try{var raw=f.layer.getLatLngs();lls=raw[0]||raw;}catch(e){}
+    if(!lls||!lls.length){try{var coords=f.gj.geometry.coordinates[0];lls=coords.map(function(c){return{lat:c[1],lng:c[0]};});}catch(e2){}}
+    if(!lls||lls.length<3) return;
     var a=0,n=lls.length;
     for(var i=0;i<n;i++){
       var j=(i+1)%n;
@@ -1601,7 +1649,16 @@ function renderE1Summary() {
   var h='';
   if(areas.length) h+='<div class="sum-row"><span>🟩 Área</span><b class="grn">'+(m2/10000).toFixed(4)+' ha</b></div>';
   if(terrs.length){
-    var td=0; terrs.forEach(function(f){var lls=f.layer.getLatLngs();for(var i=0;i<lls.length-1;i++)td+=lls[i].distanceTo(lls[i+1]);});
+    var td=0; terrs.forEach(function(f){
+  var lls=null;
+  try{lls=f.layer.getLatLngs();}catch(e){}
+  if(!lls||!lls.length){
+    try{var coords=f.gj.geometry.coordinates;lls=L.polyline(coords.map(function(c){return[c[1],c[0]];})).getLatLngs();}catch(e2){return;}
+  }
+  for(var i=0;i<lls.length-1;i++){
+    try{td+=lls[i].distanceTo(lls[i+1]);}catch(e){}
+  }
+});
     h+='<div class="sum-row"><span>〰 Terraços</span><b class="yel">'+terrs.length+' · '+(td>=1000?(td/1000).toFixed(2)+' km':td.toFixed(0)+' m')+'</b></div>';
   }
   document.getElementById('e1-sum-body').innerHTML=h;
@@ -1623,6 +1680,37 @@ function importGJ() {
     r.onload=function(ev){
       try{
         var gj=JSON.parse(ev.target.result);
+        // Detect if this is a project file (has 'exps' key) vs GeoJSON
+        if(gj.exps || gj.version) {
+          // It's a project file — load it as project
+          areaFeats.forEach(function(f){MAP.removeLayer(f.layer);});
+          areaFeats=[];areaLayers=[];
+          if(gj.e1){
+            gj.e1.forEach(function(fd){
+              var cfg=TOOLS[fd.type];if(!cfg)return;
+              var lyr=L.geoJSON(fd.gj,{style:{color:cfg.color,weight:cfg.w,dashArray:cfg.dash,fillColor:cfg.color,fillOpacity:cfg.fill?cfg.fo:0}}).addTo(MAP);
+              areaLayers.push(lyr);
+              lyr.bindTooltip('<b style="color:'+cfg.color+'">'+fd.name+'</b>',{permanent:true,direction:'center'});
+              areaFeats.push({id:Date.now()+Math.random(),type:fd.type,layer:lyr,name:fd.name,info:fd.info||'',gj:fd.gj});
+            });
+            renderE1List();renderE1Summary();
+          }
+          if(gj.exps){
+            exps.forEach(function(exp){exp.layers.forEach(function(l){MAP.removeLayer(l);});if(exp.marker)MAP.removeLayer(exp.marker);});
+            exps=[];
+            gj.exps.forEach(function(d){
+              var exp=newExp(d.lat,d.lng);Object.assign(exp,d);
+              exps.push(exp);addMarker(exp);drawExp(exp);
+            });
+            nextExpId=exps.length?Math.max.apply(null,exps.map(function(e){return e.id;}))+1:1;
+            activeExp=exps.length?exps[0].id:null;
+            renderExpList();renderExpPanel();
+          }
+          if(gj.vars){vars=gj.vars;nextVarId=vars.length?Math.max.apply(null,vars.map(function(v){return v.id;}))+1:7;renderVars();}
+          try{MAP.fitBounds(L.featureGroup(areaLayers).getBounds(),{padding:[40,40]});}catch(ex){}
+          toast('✓ Projeto carregado!');
+          return;
+        }
         areaFeats.forEach(function(f){MAP.removeLayer(f.layer);});
         areaFeats=[]; areaLayers=[];
         gj.features.forEach(function(ft){
@@ -1647,7 +1735,10 @@ function importGJ() {
         }
         renderE1List(); renderE1Summary();
         toast('✓ '+gj.features.length+' elementos carregados');
-      }catch(ex){toast('Erro ao importar','tr');}
+      }catch(ex){
+        toast('Erro ao importar: '+ex.message,'tr');
+        console.error('importGJ error:',ex);
+      }
     };
     r.readAsText(e.target.files[0]);
   };
@@ -2063,8 +2154,8 @@ function renderVars(){
   }).join('');
 }
 
-function updVar(id,key,val){var v=vars.find(function(x){return x.id===id;});if(v){v[key]=val;renderVars();}}
-function delVar(id){vars=vars.filter(function(v){return v.id!==id;});renderVars();}
+function updVar(id,key,val){var v=vars.find(function(x){return x.id===id;});if(v){v[key]=val;renderVars();autoSaveProject();}}
+function delVar(id){vars=vars.filter(function(v){return v.id!==id;});renderVars();autoSaveProject();}
 function addVar(){
   var nm=document.getElementById('v-name').value.trim();
   if(!nm){toast('Digite o nome','ty');return;}
@@ -2073,104 +2164,733 @@ function addVar(){
     sub:parseInt(document.getElementById('v-sub').value)||1,
     tipo:document.getElementById('v-tipo').value});
   document.getElementById('v-name').value='';
-  renderVars();toast('✓ Variável adicionada');
+  document.getElementById('v-unit').value='';
+  document.getElementById('v-sub').value='1';
+  renderVars();
+  autoSaveProject();
+  toast('✓ Variável adicionada');
 }
 
-function exportXLSX(){
+function debugExport(){
+  console.log('debugExport called');
+  console.log('exps:', exps.length, 'vars:', vars.length);
+  console.log('XLSX available:', typeof XLSX);
+  console.log('XLSX.utils:', typeof XLSX !== 'undefined' ? typeof XLSX.utils : 'N/A');
+  
+  if(!exps.length){
+    alert('Nenhum experimento. Adicione um experimento na Etapa 2 primeiro.');
+    return;
+  }
+  
+  alert('Iniciando geração do caderno...\nexps='+exps.length+'\nvars='+vars.length+'\nXLSX='+typeof XLSX);
+  
+  try {
+    exportXLSX();
+  } catch(e) {
+    alert('ERRO: ' + e.message + '\n' + e.stack);
+    console.error(e);
+  }
+}
+
+function abrirCadernoModal(){
   if(!exps.length){toast('Adicione experimentos primeiro','ty');return;}
-  if(!vars.length){toast('Adicione variáveis primeiro','ty');return;}
-  var wb=XLSX.utils.book_new();
-  exps.forEach(function(exp){
-    var nB=exp.delin==='NONE'?1:exp.nBlocos;
-    var hdr=['Tratamento','Bloco'];
-    vars.forEach(function(v){
-      if(v.tipo==='sub'&&v.sub>1){
-        for(var s=1;s<=v.sub;s++) hdr.push(v.name+'_'+s+'('+v.unit+')');
-        hdr.push(v.name+'_MEDIA('+v.unit+')');
-      } else {
-        hdr.push(v.name+'('+v.unit+')');
-      }
-    });
-    var rows=[hdr];
-    for(var b=0;b<nB;b++){
-      for(var t=0;t<exp.nTrat;t++){
-        var tIdx=exp.allocs[b][t];
-        var row=[exp.tratNames[tIdx]||('T'+(tIdx+1)),b+1];
-        vars.forEach(function(v){
-          if(v.tipo==='sub'&&v.sub>1){for(var s=0;s<v.sub;s++)row.push('');row.push('');}
-          else row.push('');
-        });
-        rows.push(row);
-      }
-    }
-    var ws=XLSX.utils.aoa_to_sheet(rows);
-    ws['!cols']=hdr.map(function(h){return{wch:Math.max(h.length,12)};});
-    XLSX.utils.book_append_sheet(wb,ws,(exp.name||'Exp').slice(0,31));
+  // Calculate total parcels across all experiments
+  var total=0;
+  exps.forEach(function(e){
+    var nB=e.delin==='NONE'?1:e.nBlocos;
+    total+=nB*e.nTrat;
   });
-  XLSX.writeFile(wb,'caderno_campo.xlsx');
-  toast('✓ Planilha exportada!');
+  var ano=new Date().getFullYear().toString().slice(-2);
+  document.getElementById('cad-ano').value=ano;
+  document.getElementById('cad-parc-ini').value='1';
+  updateCadernoPreview();
+  document.getElementById('caderno-modal').style.display='flex';
+  // Attach live preview
+  var elAno = document.getElementById('cad-ano');
+  var elIni = document.getElementById('cad-parc-ini');
+  if(elAno) { elAno.oninput = updateCadernoPreview; }
+  if(elIni) { elIni.oninput = updateCadernoPreview; }
 }
 
-/* ══════════════════════════════════════
-   ETAPA 4 — CROQUI
-   ══════════════════════════════════════ */
+function updateCadernoPreview(){
+  var ano=document.getElementById('cad-ano').value.trim()||'26';
+  var ini=parseInt(document.getElementById('cad-parc-ini').value)||1;
+  var total=0;
+  exps.forEach(function(e){var nB=e.delin==='NONE'?1:e.nBlocos;total+=nB*e.nTrat;});
+  var fim=ini+total-1;
+  var prev=document.getElementById('cad-parc-preview');
+  if(prev) prev.innerHTML='Prévia: <b style="color:var(--grn)">'+ano+'-'+ini+'</b> → <b style="color:var(--grn)">'+ano+'-'+fim+'</b> <span style="color:var(--mut)">('+total+' parcelas)</span>';
+}
+
+// Attach live preview update on modal open (done in abrirCadernoModal)
+
+function confirmarCaderno(){
+  var ano=document.getElementById('cad-ano').value.trim()||'26';
+  var ini=parseInt(document.getElementById('cad-parc-ini').value)||1;
+  document.getElementById('caderno-modal').style.display='none';
+  exportXLSX(ano, ini);
+}
+
+function exportXLSX(prefixoAno, parcIni){
+  prefixoAno = prefixoAno||new Date().getFullYear().toString().slice(-2);
+  parcIni    = parcIni||1;
+  toast('Gerando planilha... aguarde','');
+  if(!exps.length){toast('Adicione experimentos primeiro','ty');return;}
+
+  var PAL_T=['3FB950','64B5F6','FFB74D','F06292','BA68C8','4DD0E1',
+             'E6DB74','FF8A65','A5D6A7','90CAF9','CE93D8','80CBC4',
+             'FFCC02','EF9A9A','B0BEC5','FFE082','81C784','4FC3F7',
+             'FFD54F','E57373','9575CD','26C6DA','D4E157','FF7043'];
+
+  var wb = XLSX.utils.book_new();
+
+  exps.forEach(function(exp){
+    var nB  = exp.delin==='NONE'?1:exp.nBlocos;
+    var nT  = exp.nTrat;
+    var nP  = nB*nT;
+    var nm  = (exp.name||'Exp').slice(0,15);
+
+    // ══ ABA 1 — IDENTIFICAÇÃO ════════════════════════════════════
+    var idRows=[
+      [exp.name,'','Largura',exp.pLarg,'m'],
+      ['','','Comprimento',exp.pComp,'m'],
+      ['Delineamento',exp.delin==='NONE'?'Sem delineamento':exp.delin,'','',''],
+      ['Nº Tratamentos',nT,'','',''],
+      ['Nº Blocos',nB,'','',''],
+      ['Nº Parcelas',nP,'','',''],
+      ['Numeração',prefixoAno+'-'+parcIni+' a '+prefixoAno+'-'+(parcIni+nP-1),'','',''],
+      ['Esp. entre blocos',exp.espBlocos,'m','',''],
+      ['Rotação',exp.angle+'°','','',''],
+      [],
+      ['Tratamento','Nome','','','']
+    ];
+    for(var t=0;t<nT;t++) idRows.push(['T'+(t+1), exp.tratNames[t]||('T'+(t+1)),'','','']);
+    idRows.push([]);
+    idRows.push(['Responsável','','','','']);
+    idRows.push(['Instituição','','','','']);
+    idRows.push(['Cultura','','','','']);
+    idRows.push(['Local','','','','']);
+    idRows.push(['Safra','','','','']);
+    idRows.push(['Data Semeadura','','','','']);
+    idRows.push(['Objetivo','','','','']);
+    var wsId=XLSX.utils.aoa_to_sheet(idRows);
+    wsId['!cols']=[{wch:20},{wch:30},{wch:14},{wch:10},{wch:6}];
+    XLSX.utils.book_append_sheet(wb,wsId,nm+' Ident.');
+
+    // ══ ABA 2 — CROQUI ════════════════════════════════════════
+    var pLarg=exp.pLarg, pComp=exp.pComp, espT=exp.espTrat, espB=exp.espBlocos;
+    // SheetJS cell-level styling using xlsx-style compatible format
+    // PAL: same as Python version
+    var PAL_BG  = ['C8E6C9','BBDEFB','FFE0B2','F8BBD9','E1BEE7',
+                   'B2EBF2','FFF9C4','FFCCBC','DCEDC8','B3E5FC',
+                   'F3E5F5','B2DFDB','FFF8E1','FFEBEE','CFD8DC','FFFDE7',
+                   '81C784','64B5F6','FFB74D','F06292','BA68C8',
+                   '4DD0E1','FFF176','FF8A65','AED581','4FC3F7'];
+    var PAL_DRK = ['2E7D32','1565C0','E65100','880E4F','4A148C',
+                   '006064','F9A825','BF360C','558B2F','0277BD',
+                   '6A1B9A','00695C','F57F17','B71C1C','37474F','F57F17',
+                   '1B5E20','0D47A1','BF360C','880E4F','4A148C',
+                   '006064','F57F17','BF360C','33691E','01579B'];
+
+    // Scale: 1m -> col width / row height
+    var SCALE_W = 9.0, SCALE_H = 28.0;
+    var plotCW  = Math.max(7.5, pLarg*SCALE_W);
+    var gapCW   = Math.max(1.5, exp.espTrat*SCALE_W);
+    var plotRH  = Math.max(35,  pComp*SCALE_H);
+    var gapRH   = Math.max(10,  exp.espBlocos*SCALE_H);
+    var bordRH  = 7;
+
+    // Column layout: A=info, B=info, C=left-border, D+=plots
+    var BORD_COL  = 3;   // C
+    var PLOT_COL0 = 4;   // D = first plot column (1-based)
+    function pltCol(t){ return PLOT_COL0 + t*(exp.espTrat>0?2:1); }
+    function gapCol(t){ return pltCol(t)+1; }
+    var rightBord = pltCol(nT-1)+1;
+
+    // AOA grid — build with sparse array then convert
+    var grid = {};   // grid[r][c] = {v, s}
+    var rowH = {};   // rowH[r] = hpt
+    var colW = {};   // colW[c] = width
+    var merges = [];
+
+    function gc(r,c,v,s){ if(!grid[r]) grid[r]={}; grid[r][c]={v:v,s:s||{}}; }
+    function rh(r,h){ rowH[r]=h; }
+    function cw(c,w){ colW[c]=w; }
+
+    // Styles helper
+    function sty(bg,fgC,bold,sz,halign,valign,wrap,bdrClr,bdrW){
+      var s={};
+      if(bg)     s.fill={patternType:'solid',fgColor:{rgb:'FF'+(bg.replace('#',''))}};
+      if(fgC)    s.font={color:{rgb:'FF'+(fgC.replace('#',''))},bold:!!bold,sz:sz||10,name:'Arial'};
+      else if(bold||sz) s.font={bold:!!bold,sz:sz||10,name:'Arial'};
+      s.alignment={horizontal:halign||'center',vertical:valign||'center',wrapText:!!wrap};
+      if(bdrClr){
+        var bc={style:bdrW||'thin',color:{rgb:'FF'+bdrClr}};
+        s.border={left:bc,right:bc,top:bc,bottom:bc};
+      }
+      return s;
+    }
+    function medBdr(clr){ var bc={style:'medium',color:{rgb:'FF'+(clr||'555555')}};return{left:bc,right:bc,top:bc,bottom:bc}; }
+    function thinBdr(clr){ var bc={style:'thin',color:{rgb:'FF'+(clr||'AAAAAA')}};return{left:bc,right:bc,top:bc,bottom:bc}; }
+
+    // Fixed col widths
+    cw(1,16); cw(2,24); cw(BORD_COL,5);
+    for(var t=0;t<nT;t++){
+      cw(pltCol(t), plotCW);
+      if(exp.espTrat>0&&t<nT-1) cw(gapCol(t), gapCW);
+    }
+    cw(rightBord,5);
+
+    // ── Row 1: Title (merged)
+    rh(1,28);
+    gc(1,1,'CROQUI — '+exp.name, {
+      fill:{patternType:'solid',fgColor:{rgb:'FF1E4D2B'}},
+      font:{bold:true,sz:14,color:{rgb:'FFFFFFFF'},name:'Arial'},
+      alignment:{horizontal:'center',vertical:'center'}
+    });
+    merges.push({s:{r:0,c:0},e:{r:0,c:rightBord-1}});
+    for(var c2=2;c2<=rightBord;c2++) gc(1,c2,'',{fill:{patternType:'solid',fgColor:{rgb:'FF1E4D2B'}}});
+
+    // ── Row 2: Subtitle
+    rh(2,16);
+    var sub2 = exp.name+
+      '  |  Parcela: '+pLarg.toFixed(2)+'×'+pComp.toFixed(1)+'m'+
+      '  |  '+exp.delin+
+      '  |  '+nT+'T × '+nB+'B = '+nP+' parc.'+
+      '  |  Rot: '+exp.angle+'°';
+    gc(2,1,sub2,{
+      fill:{patternType:'solid',fgColor:{rgb:'FFE8F5E9'}},
+      font:{sz:9,italic:true,color:{rgb:'FF444444'},name:'Arial'},
+      alignment:{horizontal:'center',vertical:'center',wrapText:true}
+    });
+    merges.push({s:{r:1,c:0},e:{r:1,c:rightBord-1}});
+    for(var c3=2;c3<=rightBord;c3++) gc(2,c3,'',{fill:{patternType:'solid',fgColor:{rgb:'FFE8F5E9'}}});
+
+    // ── Row 3: Experiment info
+    rh(3,16);
+    var sub3='Responsável: '+''+'  |  Safra: '+''+'  |  Data semeadura: '+'';
+    gc(3,1,sub3,{
+      fill:{patternType:'solid',fgColor:{rgb:'FFF5F5F5'}},
+      font:{sz:9,color:{rgb:'FF555555'},name:'Arial'},
+      alignment:{horizontal:'center',vertical:'center'}
+    });
+    merges.push({s:{r:2,c:0},e:{r:2,c:rightBord-1}});
+    for(var c4=2;c4<=rightBord;c4++) gc(3,c4,'',{fill:{patternType:'solid',fgColor:{rgb:'FFF5F5F5'}}});
+
+    // ── Row 4: Widths header
+    rh(4,16);
+    gc(4,1,'VCU/Exp',sty('2D7A3E','FFFFFF',true,9,'left'));
+    gc(4,2,'LARGURA  '+pLarg.toFixed(2)+' m  →',sty('F5F5F5','555555',false,9,'left'));
+    gc(4,BORD_COL,'',sty('EEEEEE'));
+    for(var t=0;t<nT;t++){
+      gc(4,pltCol(t),pLarg.toFixed(2),sty('EEEEEE','777777',false,8));
+      if(exp.espTrat>0&&t<nT-1) gc(4,gapCol(t),exp.espTrat.toFixed(2),sty('F5F5F5','AAAAAA',false,7));
+    }
+    gc(4,rightBord,'',sty('EEEEEE'));
+
+    // ── Rows 5+: Legend on left
+    rh(5,16);
+    gc(5,1,'Tratamento',sty('2D7A3E','FFFFFF',true,9));
+    gc(5,2,'COMPRIMENTO  '+pComp.toFixed(1)+' m  ↓',sty('F5F5F5','555555',false,9,'left'));
+
+    for(var t=0;t<nT;t++){
+      var lr=6+t;
+      rh(lr,16);
+      var bgT=PAL_BG[t%PAL_BG.length], dkT=PAL_DRK[t%PAL_DRK.length];
+      gc(lr,1,'T'+(t+1),{
+        fill:{patternType:'solid',fgColor:{rgb:'FF'+bgT}},
+        font:{bold:true,sz:9,color:{rgb:'FF'+dkT},name:'Arial'},
+        alignment:{horizontal:'center',vertical:'center'},
+        border:thinBdr(dkT)
+      });
+      gc(lr,2,exp.tratNames[t]||('T'+(t+1)),{
+        fill:{patternType:'solid',fgColor:{rgb:'FFFAFAFA'}},
+        font:{sz:9,name:'Arial'},
+        alignment:{horizontal:'left',vertical:'center'},
+        border:thinBdr('CCCCCC')
+      });
+    }
+
+    // ── Croqui right side — start at row 5
+    var cr=5;
+
+    // Top border
+    rh(cr,bordRH);
+    gc(cr,BORD_COL,'0.5',sty('EEEEEE','999999',false,7));
+    for(var t=0;t<nT;t++){
+      gc(cr,pltCol(t),'',sty('EEEEEE'));
+      if(exp.espTrat>0&&t<nT-1) gc(cr,gapCol(t),'',sty('F0F0F0'));
+    }
+    gc(cr,rightBord,'0.5',sty('EEEEEE','999999',false,7));
+    cr++;
+
+    var parcNum2=parcIni;
+    for(var b=0;b<nB;b++){
+      rh(cr,plotRH);
+      // Block label
+      if(exp.delin!=='NONE'){
+        gc(cr,BORD_COL,'B'+(b+1),{
+          fill:{patternType:'solid',fgColor:{rgb:'FF2D7A3E'}},
+          font:{bold:true,sz:9,color:{rgb:'FFFFFFFF'},name:'Arial'},
+          alignment:{horizontal:'center',vertical:'center',textRotation:90},
+          border:medBdr('1E4D2B')
+        });
+      } else {
+        gc(cr,BORD_COL,pComp.toFixed(1),sty('EEEEEE','999999',false,7));
+      }
+      gc(cr,rightBord,pLarg.toFixed(2),sty('EEEEEE','999999',false,7));
+
+      for(var t=0;t<nT;t++){
+        var tIdx=exp.allocs[b][t];
+        var tNm=exp.tratNames[tIdx]||('T'+(tIdx+1));
+        var bgT2=PAL_BG[tIdx%PAL_BG.length];
+        var dkT2=PAL_DRK[tIdx%PAL_DRK.length];
+        gc(cr,pltCol(t),
+          prefixoAno+'-'+parcNum2+'\n'+tNm,
+          {
+            fill:{patternType:'solid',fgColor:{rgb:'FF'+bgT2}},
+            font:{bold:true,sz:10,color:{rgb:'FF'+dkT2},name:'Arial'},
+            alignment:{horizontal:'center',vertical:'center',wrapText:true},
+            border:medBdr(dkT2)
+          }
+        );
+        if(exp.espTrat>0&&t<nT-1){
+          gc(cr,gapCol(t),'',{
+            fill:{patternType:'solid',fgColor:{rgb:'FFFAFAFA'}},
+            border:{top:{style:'thin',color:{rgb:'FFCCCCCC'}},
+                    bottom:{style:'thin',color:{rgb:'FFCCCCCC'}}}
+          });
+        }
+        parcNum2++;
+      }
+      cr++;
+
+      // Gap between blocks
+      if(b<nB-1){
+        rh(cr,gapRH);
+        gc(cr,BORD_COL,exp.espBlocos.toFixed(1),sty('E0E0E0','777777',false,8));
+        for(var t=0;t<nT;t++){
+          gc(cr,pltCol(t),'',{fill:{patternType:'solid',fgColor:{rgb:'FFE8E8E8'}},
+            border:{left:{style:'thin',color:{rgb:'FFCCCCCC'}},right:{style:'thin',color:{rgb:'FFCCCCCC'}}}});
+          if(exp.espTrat>0&&t<nT-1) gc(cr,gapCol(t),'',sty('EFEFEF'));
+        }
+        gc(cr,rightBord,'',sty('E0E0E0'));
+        cr++;
+      }
+    }
+    // Bottom border
+    rh(cr,bordRH);
+    gc(cr,BORD_COL,'0.5',sty('EEEEEE','999999',false,7));
+    for(var t=0;t<nT;t++){
+      gc(cr,pltCol(t),'',sty('EEEEEE'));
+      if(exp.espTrat>0&&t<nT-1) gc(cr,gapCol(t),'',sty('F0F0F0'));
+    }
+    gc(cr,rightBord,'0.5',sty('EEEEEE','999999',false,7));
+
+    // Build worksheet from grid
+    var maxR2=0,maxC2=0;
+    Object.keys(grid).forEach(function(r){
+      var ri=parseInt(r); if(ri>maxR2) maxR2=ri;
+      Object.keys(grid[r]).forEach(function(c){var ci=parseInt(c);if(ci>maxC2)maxC2=ci;});
+    });
+    var aoa2=[];
+    for(var r=1;r<=maxR2;r++){
+      var row2b=[];
+      for(var c=1;c<=maxC2;c++) row2b.push(grid[r]&&grid[r][c]?grid[r][c].v:'');
+      aoa2.push(row2b);
+    }
+    wsCr=XLSX.utils.aoa_to_sheet(aoa2);
+
+    // Apply styles cell by cell
+    Object.keys(grid).forEach(function(r){
+      Object.keys(grid[r]).forEach(function(c){
+        var cell=grid[r][c];
+        if(!cell.s||Object.keys(cell.s).length===0) return;
+        var addr=XLSX.utils.encode_cell({r:parseInt(r)-1,c:parseInt(c)-1});
+        if(wsCr[addr]) wsCr[addr].s=cell.s;
+      });
+    });
+
+    // Row heights
+    wsCr['!rows']=[];
+    for(var r=1;r<=maxR2;r++) wsCr['!rows'].push(rowH[r]?{hpt:rowH[r]}:{hpt:15});
+
+    // Col widths
+    var colWidths2=[];
+    for(var c=1;c<=maxC2;c++) colWidths2.push(colW[c]?{wch:colW[c]}:{wch:8});
+    wsCr['!cols']=colWidths2;
+    wsCr['!merges']=merges;
+
+    XLSX.utils.book_append_sheet(wb,wsCr,nm+' Croqui');
+
+        // ══ ABAS COLETA ══════════════════════════════════════════════
+    vars.forEach(function(vr,vi){
+      var nsub=vr.tipo==='sub'?vr.sub:1;
+      var hdr=['Nº Parc.','Bloco','Trat.','Nome'];
+      if(nsub>1){
+        for(var s=1;s<=nsub;s++) hdr.push('Sub'+s+' ('+vr.unit+')');
+        hdr.push('Média ('+vr.unit+')');
+      } else {
+        hdr.push(vr.name+' ('+vr.unit+')');
+      }
+      var rows=[
+        ['COLETA — '+vr.name+' ('+vr.unit+') — '+exp.name],
+        ['Responsável: _______________   Data: ___/___/______   Safra: ___________'],
+        [],hdr
+      ];
+      var pN=1;
+      for(var b=0;b<nB;b++){
+        for(var t=0;t<nT;t++){
+          var tIdx=exp.allocs[b][t];
+          var row=[prefixoAno+'-'+(parcIni+pN-1),exp.delin!=='NONE'?b+1:'–','T'+(tIdx+1),exp.tratNames[tIdx]||('T'+(tIdx+1))];
+          for(var s=0;s<nsub;s++) row.push('');
+          if(nsub>1) row.push('');
+          rows.push(row); pN++;
+        }
+      }
+      var ws=XLSX.utils.aoa_to_sheet(rows);
+      var cols=[{wch:7},{wch:7},{wch:7},{wch:28}];
+      for(var s=0;s<=nsub;s++) cols.push({wch:12});
+      ws['!cols']=cols;
+      XLSX.utils.book_append_sheet(wb,ws,('E'+exps.indexOf(exp)+'C'+(vi+1)+'_'+vr.name).slice(0,31));
+    });
+
+    // ══ ABAS RESUMO + BOX PLOT ═══════════════════════════════════
+    vars.forEach(function(vr,vi){
+      var nsub=vr.tipo==='sub'?vr.sub:1;
+      var shClt='E'+exps.indexOf(exp)+'C'+(vi+1)+'_'+vr.name;
+      var valColIdx=nsub>1?4+nsub:4;
+      var valColLet=String.fromCharCode(65+valColIdx);
+      var cRef="'"+shClt+"'!$C$5:$C$"+(4+nP);
+      var vRef="'"+shClt+"'!$"+valColLet+"$5:$"+valColLet+"$"+(4+nP);
+      var gm='AVERAGE('+vRef+')';
+
+      var treatNames=[];
+      for(var t=0;t<nT;t++) treatNames.push(exp.tratNames[t]||('T'+(t+1)));
+
+      var resRows=[
+        ['RESUMO ESTATÍSTICO — '+vr.name+' ('+vr.unit+') — '+exp.name],
+        [],
+        ['Estatística','Descrição'].concat(treatNames)
+      ];
+
+      var statDefs=[
+        ['n','Nº observações',function(crit){return {f:'COUNTIF('+cRef+','+crit+')'} ;}],
+        ['Média','Média aritmética',function(crit){return {f:'IFERROR(AVERAGEIF('+cRef+','+crit+','+vRef+'),"–")'};}],
+        ['Mediana','Mediana',function(crit){return {f:'IFERROR(MEDIAN(IF('+cRef+'='+crit+','+vRef+')),"–")'};}],
+        ['DP','Desvio padrão',function(crit){return {f:'IFERROR(STDEV(IF('+cRef+'='+crit+','+vRef+')),"–")'};}],
+        ['CV%','Coef. de variação (%)',function(crit){return {f:'IFERROR(STDEV(IF('+cRef+'='+crit+','+vRef+'))/AVERAGEIF('+cRef+','+crit+','+vRef+')*100,"–")'};}],
+        ['Mínimo','Valor mínimo',function(crit){return {f:'IFERROR(MINIFS('+vRef+','+cRef+','+crit+'),"–")'};}],
+        ['Q1','1º Quartil (25%)',function(crit){return {f:'IFERROR(QUARTILE(IF('+cRef+'='+crit+','+vRef+'),1),"–")'};}],
+        ['Mediana','Mediana (Q2)',function(crit){return {f:'IFERROR(QUARTILE(IF('+cRef+'='+crit+','+vRef+'),2),"–")'};}],
+        ['Q3','3º Quartil (75%)',function(crit){return {f:'IFERROR(QUARTILE(IF('+cRef+'='+crit+','+vRef+'),3),"–")'};}],
+        ['Máximo','Valor máximo',function(crit){return {f:'IFERROR(MAXIFS('+vRef+','+cRef+','+crit+'),"–")'};}],
+        ['IQR','Interquartil (Q3−Q1)',function(crit){return {f:'IFERROR(QUARTILE(IF('+cRef+'='+crit+','+vRef+'),3)-QUARTILE(IF('+cRef+'='+crit+','+vRef+'),1),"–")'};}],
+        ['Amplitude','Máx − Mín',function(crit){return {f:'IFERROR(MAXIFS('+vRef+','+cRef+','+crit+')-MINIFS('+vRef+','+cRef+','+crit+'),"–")'};}],
+        ['Lim.Inf.','Q1 − 1.5×IQR (outlier ↓)',function(crit){return {f:'IFERROR(QUARTILE(IF('+cRef+'='+crit+','+vRef+'),1)-1.5*(QUARTILE(IF('+cRef+'='+crit+','+vRef+'),3)-QUARTILE(IF('+cRef+'='+crit+','+vRef+'),1)),"–")'};}],
+        ['Lim.Sup.','Q3 + 1.5×IQR (outlier ↑)',function(crit){return {f:'IFERROR(QUARTILE(IF('+cRef+'='+crit+','+vRef+'),3)+1.5*(QUARTILE(IF('+cRef+'='+crit+','+vRef+'),3)-QUARTILE(IF('+cRef+'='+crit+','+vRef+'),1)),"–")'};}],
+        ['Assimetria','SKEW (assimetria)',function(crit){return {f:'IFERROR(SKEW(IF('+cRef+'='+crit+','+vRef+')),"–")'};}],
+        ['Curtose','KURT (curtose)',function(crit){return {f:'IFERROR(KURT(IF('+cRef+'='+crit+','+vRef+')),"–")'};}],
+        ['Soma','Soma total',function(crit){return {f:'IFERROR(SUMIF('+cRef+','+crit+','+vRef+'),"–")'};}],
+        ['Variância','Variância amostral',function(crit){return {f:'IFERROR(VAR(IF('+cRef+'='+crit+','+vRef+')),"–")'};}]
+      ];
+
+      statDefs.forEach(function(st){
+        var row=[st[0],st[1]];
+        for(var t=0;t<nT;t++){
+          row.push(st[2]('"T'+(t+1)+'"'));
+        }
+        resRows.push(row);
+      });
+
+      // Box plot table
+      resRows.push([]);
+      resRows.push(['─── TABELA PARA BOX PLOT ───']);
+      resRows.push(['Selecione esta tabela → Inserir → Gráfico → Estatístico → Caixa e Whisker']);
+      resRows.push([]);
+
+      var bpHdr=['Tratamento'].concat(treatNames);
+      resRows.push(bpHdr);
+
+      // Rows: Mín, Q1, Mediana, Média, Q3, Máx
+      // Reference the stats rows above
+      // Stats start at row 4 (1-based): n=4, Média=5, Mediana=6, DP=7, CV%=8, Mín=9, Q1=10, Mediana(Q2)=11, Q3=12, Máx=13
+      var statRow={n:4,Media:5,Mediana:6,DP:7,CV:8,Min:9,Q1:10,Q2:11,Q3:12,Max:13};
+      var bpStats=[
+        ['Mínimo',    statRow.Min],
+        ['Q1 (25%)',  statRow.Q1],
+        ['Mediana',   statRow.Q2],
+        ['Média',     statRow.Media],
+        ['Q3 (75%)',  statRow.Q3],
+        ['Máximo',    statRow.Max]
+      ];
+
+      bpStats.forEach(function(bs){
+        var row=[bs[0]];
+        for(var t=0;t<nT;t++){
+          var col=String.fromCharCode(67+t); // C=T1, D=T2...
+          row.push({f:col+bs[1]});
+        }
+        resRows.push(row);
+      });
+
+      resRows.push([]);
+      resRows.push(['Dica: após gerar o gráfico, clique com botão direito → Formatar série → mostrar pontos individuais (outliers)']);
+
+      var wsRes=XLSX.utils.aoa_to_sheet(resRows);
+      var resCols=[{wch:16},{wch:30}];
+      for(var t=0;t<nT;t++) resCols.push({wch:16});
+      wsRes['!cols']=resCols;
+      XLSX.utils.book_append_sheet(wb,wsRes,('E'+exps.indexOf(exp)+'R'+(vi+1)+'_'+vr.name).slice(0,31));
+    });
+
+    parcIni += nP; // next experiment starts after this one
+  }); // end exps.forEach
+
+  // Use blob download — works in all browsers including file://
+  try {
+    var wbout = XLSX.write(wb, {bookType:'xlsx', type:'array'});
+    var blob  = new Blob([wbout], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+    var url   = URL.createObjectURL(blob);
+    var a     = document.createElement('a');
+    a.href    = url;
+    a.download= 'caderno_campo_agrolayout.xlsx';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 2000);
+    toast('✓ Caderno de campo exportado!');
+  } catch(e) {
+    toast('Erro ao gerar planilha: '+e.message,'tr');
+    console.error(e);
+  }
+}
+
 function printCroqui(){
-  var eList=exps.filter(function(e){return e.visible&&e._gj&&e._gj.length;});
-  if(!eList.length){toast('Nenhum experimento para imprimir','ty');return;}
-  var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Croqui</title>'
-    +'<style>body{font-family:Arial,sans-serif;font-size:11px;margin:20px}'
-    +'h2{font-size:13px;border-bottom:2px solid #333;padding-bottom:3px;margin:16px 0 6px}'
-    +'h3{font-size:11px;margin:10px 0 4px;color:#444}'
-    +'.meta{font-size:10px;color:#555;margin-bottom:8px}'
-    +'table{border-collapse:collapse;width:100%;margin-bottom:10px;font-size:10px}'
-    +'th{background:#1e4d2b;color:#fff;padding:4px 6px;text-align:center;border:1px solid #999}'
-    +'td{padding:3px 6px;border:1px solid #ccc;text-align:center}'
-    +'.leg{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}'
-    +'.li{display:flex;align-items:center;gap:4px;font-size:10px}'
-    +'.ld{width:14px;height:14px;border-radius:2px;border:1px solid #999}'
-    +'.pb{page-break-before:always}'
-    +'</style></head><body>';
-  eList.forEach(function(exp,ei){
-    if(ei>0) html+='<div class="pb"></div>';
-    var nB=exp.delin==='NONE'?1:exp.nBlocos;
-    var bW=(exp.nTrat*exp.pLarg+(exp.nTrat-1)*exp.espTrat).toFixed(2);
-    var tH=(nB*exp.pComp+(nB-1)*exp.espBlocos).toFixed(1);
-    html+='<h2>'+exp.name+'</h2>';
-    html+='<div class="meta">'+(exp.delin==='NONE'?'Grade':exp.delin)+' | Parcela: '+exp.pLarg+'×'+exp.pComp+'m | '+bW+'×'+tH+'m | Rot: '+exp.angle+'°</div>';
-    html+='<h3>Legenda</h3><div class="leg">';
-    for(var i=0;i<exp.nTrat;i++) html+='<div class="li"><div class="ld" style="background:'+PAL[i%PAL.length]+'"></div>'+(exp.tratNames[i]||'T'+(i+1))+'</div>';
-    html+='</div>';
-    html+='<h3>Croqui aleatorizado</h3><table><thead><tr><th>'+(exp.delin!=='NONE'?'Bloco':'')+'</th>';
-    for(var t=0;t<exp.nTrat;t++) html+='<th>'+(t+1)+'ª</th>';
-    html+='</tr></thead><tbody>';
-    for(var b=0;b<nB;b++){
-      html+='<tr><td><b>'+(exp.delin!=='NONE'?'B'+(b+1):'–')+'</b></td>';
-      for(var t=0;t<exp.nTrat;t++){var tIdx=exp.allocs[b][t];html+='<td style="background:'+PAL[tIdx%PAL.length]+'88">'+(exp.tratNames[tIdx]||'T'+(tIdx+1))+'</td>';}
-      html+='</tr>';
+  var eList = exps.filter(function(e){ return e.visible && e._gj && e._gj.length; });
+  if(!eList.length){ toast('Nenhum experimento para imprimir','ty'); return; }
+
+  var PAL_T=['3FB950','64B5F6','FFB74D','F06292','BA68C8','4DD0E1',
+             'E6DB74','FF8A65','A5D6A7','90CAF9','CE93D8','80CBC4',
+             'FFCC02','EF9A9A','B0BEC5','FFE082','81C784','4FC3F7',
+             'FFD54F','E57373','9575CD','26C6DA','D4E157','FF7043'];
+
+  var html = '<!DOCTYPE html><html lang="pt-BR"><head>'
+    + '<meta charset="UTF-8">'
+    + '<title>Croqui — AgroLayout</title>'
+    + '<style>'
+    + 'body{font-family:Arial,sans-serif;font-size:11px;margin:16px;color:#111}'
+    + 'h1{font-size:15px;color:#1e4d2b;margin-bottom:2px}'
+    + 'h2{font-size:13px;color:#1e4d2b;border-bottom:2px solid #1e4d2b;padding-bottom:3px;margin:18px 0 6px}'
+    + 'h3{font-size:11px;margin:10px 0 4px;color:#444}'
+    + '.meta{font-size:10px;color:#555;margin-bottom:8px;line-height:1.7}'
+    + '.croqui-wrap{overflow-x:auto;margin-bottom:12px}'
+    + 'table.croqui{border-collapse:collapse;font-size:10px}'
+    + 'table.croqui td{border:1px solid #666;text-align:center;vertical-align:middle;padding:2px 3px}'
+    + 'table.croqui td.bloco-lbl{background:#2d7a3e;color:#fff;font-weight:700;writing-mode:vertical-rl;transform:rotate(180deg);width:22px;padding:4px 2px;font-size:9px}'
+    + 'table.croqui td.esp-blocos{background:#e0e0e0;color:#555;font-size:9px;height:10px}'
+    + 'table.croqui td.parc{font-weight:700;line-height:1.3}'
+    + 'table.croqui td.dim-top{background:#f5f5f5;font-size:8px;color:#666;border:none}'
+    + 'table.croqui td.dim-side{background:#f5f5f5;font-size:8px;color:#666;border:none;width:22px}'
+    + '.legend{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 10px}'
+    + '.legend-item{display:flex;align-items:center;gap:4px;font-size:10px}'
+    + '.legend-dot{width:14px;height:14px;border-radius:2px;border:1px solid #aaa;flex-shrink:0}'
+    + 'table.aloc{border-collapse:collapse;width:100%;font-size:10px;margin-bottom:8px}'
+    + 'table.aloc th{background:#1e4d2b;color:#fff;padding:4px 6px;text-align:center;border:1px solid #aaa}'
+    + 'table.aloc td{padding:3px 6px;border:1px solid #ccc;text-align:center}'
+    + '.info-box{display:grid;grid-template-columns:1fr 1fr;gap:4px 16px;margin-bottom:8px;font-size:10px}'
+    + '.info-box span{color:#555}'
+    + '.info-box b{color:#111}'
+    + '.pb{page-break-before:always}'
+    + '@media print{body{margin:8px}.pb{page-break-before:always}}'
+    + '</style></head><body>';
+
+  html += '<h1>🌾 Croqui de Experimentos — AgroLayout</h1>';
+  html += '<div class="meta">Gerado em: ' + new Date().toLocaleString('pt-BR') + '</div>';
+
+  eList.forEach(function(exp, ei){
+    if(ei>0) html += '<div class="pb"></div>';
+
+    var nB    = exp.delin==='NONE'?1:exp.nBlocos;
+    var nT    = exp.nTrat;
+    var bW    = (exp.nTrat*exp.pLarg+(exp.nTrat-1)*exp.espTrat).toFixed(2);
+    var tH    = (nB*exp.pComp+(nB-1)*exp.espBlocos).toFixed(1);
+    var ha    = (bW*tH/10000).toFixed(4);
+
+    html += '<h2>' + exp.name + '</h2>';
+    html += '<div class="info-box">'
+      + '<div><span>Delineamento: </span><b>' + (exp.delin==='NONE'?'Sem delin.':exp.delin) + '</b></div>'
+      + '<div><span>Parcela: </span><b>' + exp.pLarg + ' × ' + exp.pComp + ' m</b></div>'
+      + '<div><span>Tratamentos: </span><b>' + nT + '</b></div>'
+      + '<div><span>Blocos: </span><b>' + (exp.delin==='NONE'?'–':nB) + '</b></div>'
+      + '<div><span>Área total: </span><b>' + bW + ' × ' + tH + ' m (' + ha + ' ha)</b></div>'
+      + '<div><span>Rotação: </span><b>' + exp.angle + '°</b></div>'
+      + (exp.espBlocos>0?'<div><span>Esp. blocos: </span><b>'+exp.espBlocos+' m</b></div>':'')
+      + (exp.espTrat>0?'<div><span>Esp. parcelas: </span><b>'+exp.espTrat+' m</b></div>':'')
+      + '</div>';
+
+    // Legenda
+    html += '<h3>Legenda</h3><div class="legend">';
+    for(var t=0;t<nT;t++){
+      var bg = PAL_T[t%PAL_T.length];
+      html += '<div class="legend-item">'
+        + '<div class="legend-dot" style="background:#'+bg+'"></div>'
+        + (exp.tratNames[t]||'T'+(t+1))
+        + '</div>';
     }
-    html+='</tbody></table>';
-    html+='<h3>Tabela de aleatorização</h3><table><thead><tr><th>Bloco</th>';
-    for(var t=0;t<exp.nTrat;t++) html+='<th>Pos '+(t+1)+'</th>';
-    html+='</tr></thead><tbody>';
-    for(var b=0;b<nB;b++){
-      html+='<tr><td><b>'+(exp.delin!=='NONE'?'B'+(b+1):'–')+'</b></td>';
-      for(var t=0;t<exp.nTrat;t++){html+='<td>'+(exp.tratNames[exp.allocs[b][t]]||'T'+(exp.allocs[b][t]+1))+'</td>';}
-      html+='</tr>';
+    html += '</div>';
+
+    // Croqui visual
+    html += '<h3>Croqui</h3>';
+    html += '<div class="croqui-wrap"><table class="croqui">';
+
+    // Header row com larguras
+    html += '<tr><td class="dim-top" style="width:22px"></td><td class="dim-top" style="width:22px"></td>';
+    for(var t=0;t<nT;t++){
+      html += '<td class="dim-top" style="width:'+(exp.pLarg*60)+'px">'
+        + exp.pLarg.toFixed(2)+'m'
+        + (exp.espTrat>0&&t<nT-1?'</td><td class="dim-top" style="width:'+(exp.espTrat*30)+'px">'+exp.espTrat+'m':'')
+        + '</td>';
     }
-    html+='</tbody></table>';
-    html+='<h3>Coordenadas GPS (canto SW)</h3><table><thead><tr><th>Bloco</th><th>Tratamento</th><th>Latitude</th><th>Longitude</th></tr></thead><tbody>';
-    exp._gj.forEach(function(f){var p=f.properties,c=f.geometry.coordinates[0][0];html+='<tr><td>'+(exp.delin!=='NONE'?'B'+p.bloco:'–')+'</td><td>'+p.trat_nome+'</td><td>'+c[1].toFixed(6)+'</td><td>'+c[0].toFixed(6)+'</td></tr>';});
-    html+='</tbody></table>';
+    html += '</tr>';
+
+    var parcNum = 1;
+    for(var b=0;b<nB;b++){
+      // Plot row
+      var plotH = Math.max(40, exp.pComp*8);
+      html += '<tr>';
+      // Block label
+      if(exp.delin!=='NONE'){
+        html += '<td class="bloco-lbl" style="height:'+plotH+'px">Bloco '+(b+1)+'</td>';
+      } else {
+        html += '<td class="dim-side"></td>';
+      }
+      // Side dimension
+      html += '<td class="dim-side">'+exp.pComp.toFixed(1)+'m</td>';
+
+      for(var t=0;t<nT;t++){
+        var tIdx = exp.allocs[b][t];
+        var bg   = PAL_T[tIdx%PAL_T.length];
+        var tNm  = exp.tratNames[tIdx]||('T'+(tIdx+1));
+        html += '<td class="parc" style="background:#'+bg+'44;height:'+plotH+'px">'
+          + '<div style="font-size:8px;color:#555">'+parcNum+'</div>'
+          + '<div>' + tNm + '</div>'
+          + '</td>';
+        if(exp.espTrat>0 && t<nT-1){
+          html += '<td style="width:'+(exp.espTrat*30)+'px;background:#fafafa;font-size:8px;color:#aaa">'
+            + exp.espTrat+'m</td>';
+        }
+        parcNum++;
+      }
+      html += '</tr>';
+
+      // Spacing between blocks
+      if(b<nB-1){
+        var espCols = nT + (exp.espTrat>0?(nT-1):0);
+        html += '<tr><td class="esp-blocos"></td><td class="dim-side" style="font-size:8px">'+exp.espBlocos.toFixed(1)+'m</td>';
+        for(var c=0;c<espCols;c++) html += '<td class="esp-blocos"></td>';
+        html += '</tr>';
+      }
+    }
+    html += '</table></div>';
+
+    // Tabela de aleatorização
+    html += '<h3>Tabela de Aleatorização</h3>';
+    html += '<table class="aloc"><thead><tr><th>'+(exp.delin!=='NONE'?'Bloco':'')+'</th>';
+    for(var t=0;t<nT;t++) html += '<th>Pos '+(t+1)+'</th>';
+    html += '</tr></thead><tbody>';
+    var pN2=1;
+    for(var b=0;b<nB;b++){
+      html += '<tr><td><b>'+(exp.delin!=='NONE'?'B'+(b+1):'–')+'</b></td>';
+      for(var t=0;t<nT;t++){
+        var tIdx=exp.allocs[b][t];
+        var bg=PAL_T[tIdx%PAL_T.length];
+        html += '<td style="background:#'+bg+'44">'
+          + '<div style="font-size:8px;color:#555">'+pN2+'</div>'
+          + (exp.tratNames[tIdx]||'T'+(tIdx+1))
+          + '</td>';
+        pN2++;
+      }
+      html += '</tr>';
+    }
+    html += '</tbody></table>';
+
+    // Coordenadas GPS
+    html += '<h3>Coordenadas GPS</h3>';
+    html += '<table class="aloc"><thead><tr><th>Nº Parc.</th><th>Bloco</th><th>Tratamento</th><th>Latitude</th><th>Longitude</th></tr></thead><tbody>';
+    if(exp._gj) exp._gj.forEach(function(f){
+      var p=f.properties, c=f.geometry.coordinates[0][0];
+      html += '<tr>'
+        +'<td>'+p.trat_idx+'</td>'
+        +'<td>'+(exp.delin!=='NONE'?'B'+p.bloco:'–')+'</td>'
+        +'<td>'+p.trat_nome+'</td>'
+        +'<td>'+c[1].toFixed(6)+'</td>'
+        +'<td>'+c[0].toFixed(6)+'</td>'
+        +'</tr>';
+    });
+    html += '</tbody></table>';
   });
-  html+='</body></html>';
-  var w=window.open('','_blank');w.document.write(html);w.document.close();
-  setTimeout(function(){w.print();},500);
+
+  html += '</body></html>';
+
+  var w = window.open('','_blank');
+  if(!w){ toast('Popup bloqueado — permita popups para este site','ty'); return; }
+  w.document.write(html);
+  w.document.close();
+  setTimeout(function(){ w.focus(); w.print(); }, 600);
+}
+
+function exportGeoJSONExps(){
+  var features=[];
+  // Include area demarcada
+  areaFeats.forEach(function(f){
+    var ft=JSON.parse(JSON.stringify(f.gj));
+    ft.properties={type:f.type,name:f.name,layer:'area_demarcada'};
+    features.push(ft);
+  });
+  // Include experiment parcels
+  exps.forEach(function(exp){
+    if(!exp._gj) return;
+    exp._gj.forEach(function(f){ features.push(f); });
+  });
+  if(!features.length){toast('Nenhum elemento para exportar','ty');return;}
+  var gj={
+    type:'FeatureCollection',
+    name:'AgroLayout_Experimentos',
+    crs:{type:'name',properties:{name:'urn:ogc:def:crs:OGC:1.3:CRS84'}},
+    features:features
+  };
+  var a=document.createElement('a');
+  a.href='data:application/geo+json;charset=utf-8,'+encodeURIComponent(JSON.stringify(gj,null,2));
+  a.download='experimentos_agrolayout.geojson';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  toast('✓ GeoJSON exportado! ('+features.length+' parcelas)');
 }
 
 function exportKMLExps(){
   var all=[];exps.forEach(function(exp){if(exp._gj)all=all.concat(exp._gj);});
   if(!all.length){toast('Nenhum experimento','ty');return;}
   var kml='<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2"><Document>\n';
+
+  // ── Área demarcada e terraços ─────────────────────────────────
+  if(areaFeats.length){
+    kml+='<Folder><name>Área Demarcada</name>\n';
+    kml+='<Style id="area"><LineStyle><color>ff3fb950</color><width>3</width></LineStyle><PolyStyle><color>223fb950</color></PolyStyle></Style>\n';
+    kml+='<Style id="terraco"><LineStyle><color>ffe3b341</color><width>3</width></LineStyle><PolyStyle><fill>0</fill></PolyStyle></Style>\n';
+    areaFeats.forEach(function(f){
+      var g=f.gj.geometry;
+      kml+='<Placemark><name>'+xe(f.name)+'</name><styleUrl>#'+f.type+'</styleUrl>';
+      if(g.type==='Polygon'){
+        var coords=g.coordinates[0].map(function(p){return p[0]+','+p[1]+',0';}).join('\n');
+        kml+='<Polygon><outerBoundaryIs><LinearRing><coordinates>'+coords+'</coordinates></LinearRing></outerBoundaryIs></Polygon>';
+      } else if(g.type==='LineString'){
+        var coords2=g.coordinates.map(function(p){return p[0]+','+p[1]+',0';}).join('\n');
+        kml+='<LineString><coordinates>'+coords2+'</coordinates></LineString>';
+      }
+      kml+='</Placemark>\n';
+    });
+    kml+='</Folder>\n';
+  }
   exps.forEach(function(exp){
     kml+='<Folder><n>'+xe(exp.name)+'</n>\n';
     for(var i=0;i<exp.nTrat;i++) kml+='<Style id="e'+exp.id+'t'+i+'"><LineStyle><color>ff000000</color><width>1</width></LineStyle><PolyStyle><color>99'+PAL[i%PAL.length].slice(5,7)+PAL[i%PAL.length].slice(3,5)+PAL[i%PAL.length].slice(1,3)+'</color></PolyStyle></Style>\n';
@@ -2201,6 +2921,21 @@ function exportCSV(){
 /* ══════════════════════════════════════
    SAVE / LOAD PROJECT
    ══════════════════════════════════════ */
+function autoSaveProject(){
+  // Save silently to localStorage (no toast, no download)
+  try {
+    var proj={v:3,date:new Date().toISOString(),
+      e1:areaFeats.map(function(f){return{type:f.type,name:f.name,info:f.info,gj:f.gj};}),
+      exps:exps.map(function(exp){return{id:exp.id,name:exp.name,color:exp.color,
+        lat:exp.lat,lng:exp.lng,angle:exp.angle,delin:exp.delin,nTrat:exp.nTrat,
+        nBlocos:exp.nBlocos,nLinhas:exp.nLinhas,espLinhas:exp.espLinhas,
+        pLarg:exp.pLarg,pComp:exp.pComp,espTrat:exp.espTrat,espBlocos:exp.espBlocos,
+        bloco1Fixed:exp.bloco1Fixed,visible:exp.visible,tratNames:exp.tratNames,allocs:exp.allocs};}),
+      vars:vars};
+    localStorage.setItem('agrolayout-autosave', JSON.stringify(proj));
+  } catch(e){ console.warn('Auto-save failed:', e.message); }
+}
+
 function saveProject(){
   var proj={version:3,date:new Date().toISOString(),
     e1:areaFeats.map(function(f){return{type:f.type,name:f.name,info:f.info,gj:f.gj};}),
@@ -2578,14 +3313,230 @@ function onOrientation(e){
   }
 }
 
+
+/* ══════════════════════════════════════
+   HISTÓRICO DE ENSAIOS
+   ══════════════════════════════════════ */
+
+var HIST_KEY = 'agrolayout-historico';
+
+function histLoad() {
+  try { return JSON.parse(localStorage.getItem(HIST_KEY) || '[]'); }
+  catch(e){ return []; }
+}
+
+function histSave(list) {
+  try { localStorage.setItem(HIST_KEY, JSON.stringify(list)); } catch(e){}
+}
+
+function histAddCurrent() {
+  if (!exps.length) { toast('Nenhum experimento para registrar','ty'); return; }
+  var list = histLoad();
+  var date = new Date().toLocaleDateString('pt-BR');
+
+  exps.forEach(function(exp) {
+    var center = getAreaCenter();
+    var entry = {
+      id:         Date.now() + Math.random(),
+      data:       date,
+      safra:      document.getElementById('hist-safra').value.trim() || '–',
+      cultura:    document.getElementById('hist-cultura').value.trim() || '–',
+      local:      document.getElementById('hist-local').value.trim() || '–',
+      nome:       exp.name,
+      lat:        parseFloat(exp.lat.toFixed(6)),
+      lng:        parseFloat(exp.lng.toFixed(6)),
+      nTrat:      exp.nTrat,
+      nBlocos:    exp.delin==='NONE'?1:exp.nBlocos,
+      delin:      exp.delin,
+      color:      exp.color
+    };
+    list.unshift(entry);
+  });
+
+  histSave(list);
+  toast('✓ ' + exps.length + ' ensaio(s) registrado(s) no histórico');
+  renderHist();
+}
+
+function histDelete(id) {
+  var list = histLoad().filter(function(e){ return e.id !== id; });
+  histSave(list);
+  renderHist();
+  toast('Registro removido','ty');
+}
+
+function histClear() {
+  if (!confirm('Apagar todo o histórico?')) return;
+  histSave([]);
+  renderHist();
+  toast('Histórico apagado','ty');
+}
+
+function histShowOnMap(lat, lng) {
+  MAP.setView([lat, lng], 18);
+  goStep(1);
+  var mk = L.marker([lat,lng], {
+    icon: L.divIcon({
+      html: '<div style="width:20px;height:20px;background:#e3b341;border:3px solid #fff;border-radius:50%;box-shadow:0 0 8px #e3b34199"></div>',
+      iconSize:[20,20], iconAnchor:[10,10], className:''
+    })
+  }).addTo(MAP);
+  setTimeout(function(){ MAP.removeLayer(mk); }, 4000);
+}
+
+function histShowAllMap() {
+  var list = histLoad();
+  if (!list.length) { toast('Histórico vazio','ty'); return; }
+
+  // Remove old hist markers
+  if (window._histMarkers) {
+    window._histMarkers.forEach(function(m){ MAP.removeLayer(m); });
+  }
+  window._histMarkers = [];
+
+  // Group by safra for colors
+  var safras = {};
+  list.forEach(function(e){ safras[e.safra] = safras[e.safra] || []; safras[e.safra].push(e); });
+  var safraColors = ['#e3b341','#f85149','#79c0ff','#56d364','#d2a8ff','#ffa657'];
+  var safraList   = Object.keys(safras);
+
+  var lats=[], lngs=[];
+  list.forEach(function(e, i) {
+    var sIdx = safraList.indexOf(e.safra);
+    var col  = safraColors[sIdx % safraColors.length];
+    var mk = L.marker([e.lat, e.lng], {
+      icon: L.divIcon({
+        html: '<div style="background:'+col+';border:2px solid #fff;border-radius:5px;padding:2px 6px;font-size:9px;font-weight:700;color:#000;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.5)">'+e.safra+'</div>',
+        iconSize:[0,0], iconAnchor:[0,0], className:''
+      })
+    }).addTo(MAP);
+    mk.bindTooltip(
+      '<b>'+e.nome+'</b><br>'+e.safra+' · '+e.cultura+'<br>'+e.local+'<br>'+e.nTrat+'T × '+e.nBlocos+'B',
+      {direction:'top'}
+    );
+    window._histMarkers.push(mk);
+    lats.push(e.lat); lngs.push(e.lng);
+  });
+
+  if (lats.length) {
+    MAP.fitBounds(L.latLngBounds(
+      L.latLng(Math.min.apply(null,lats), Math.min.apply(null,lngs)),
+      L.latLng(Math.max.apply(null,lats), Math.max.apply(null,lngs))
+    ), {padding:[60,60], maxZoom:18});
+  }
+  toast('✓ ' + list.length + ' ensaios no mapa');
+}
+
+function histExport() {
+  var list = histLoad();
+  if (!list.length) { toast('Histórico vazio','ty'); return; }
+  var rows = ['Safra,Cultura,Local,Experimento,Data,Latitude,Longitude,Tratamentos,Blocos,Delineamento'];
+  list.forEach(function(e){
+    rows.push([
+      e.safra, e.cultura, '"'+e.local+'"', '"'+e.nome+'"',
+      e.data, e.lat, e.lng, e.nTrat, e.nBlocos, e.delin
+    ].join(','));
+  });
+  var a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(rows.join('\n'));
+  a.download = 'historico_ensaios.csv';
+  a.click();
+  toast('✓ Histórico exportado!');
+}
+
+function renderHist() {
+  var list = histLoad();
+  var el   = document.getElementById('hist-list');
+  if (!list.length) {
+    el.innerHTML = '<div class="empty">Nenhum ensaio registrado ainda</div>';
+    return;
+  }
+
+  // Group by safra
+  var safras = {};
+  list.forEach(function(e){
+    if (!safras[e.safra]) safras[e.safra] = [];
+    safras[e.safra].push(e);
+  });
+
+  var html = '';
+  Object.keys(safras).forEach(function(safra) {
+    html += '<div class="hist-safra-hd">🌾 Safra ' + safra + ' <span>(' + safras[safra].length + ' ensaio(s))</span></div>';
+    safras[safra].forEach(function(e) {
+      html += '<div class="hist-item">'
+        + '<div class="hist-dot" style="background:' + (e.color||'#3fb950') + '"></div>'
+        + '<div class="hist-info">'
+          + '<div class="hist-nome">' + e.nome + '</div>'
+          + '<div class="hist-meta">' + e.cultura + ' · ' + e.local + '</div>'
+          + '<div class="hist-meta">' + e.nTrat + 'T × ' + e.nBlocos + 'B · ' + e.delin + ' · ' + e.data + '</div>'
+          + '<div class="hist-coords">' + e.lat + ', ' + e.lng + '</div>'
+        + '</div>'
+        + '<div class="hist-acts">'
+          + '<button class="icon-btn" onclick="histShowOnMap(' + e.lat + ',' + e.lng + ')" title="Ver no mapa">🗺</button>'
+          + '<button class="del-btn" onclick="histDelete(' + e.id + ')" title="Remover">✕</button>'
+        + '</div>'
+        + '</div>';
+    });
+  });
+  el.innerHTML = html;
+}
+
 window.addEventListener('load',function(){
   initMap();
   goStep(1);
   geoLocate(true);
+  // Restore auto-saved session if exists
+  try {
+    var saved = localStorage.getItem('agrolayout-autosave');
+    if(saved){
+      var proj = JSON.parse(saved);
+      if(proj.vars && proj.vars.length){
+        vars = proj.vars;
+        nextVarId = Math.max.apply(null, vars.map(function(v){return v.id+1;}));
+        renderVars();
+        setSt('Variáveis restauradas da sessão anterior', true);
+      }
+    }
+  } catch(e){}
   // Show tutorial after a short delay
   setTimeout(tutShow, 800);
 });
 </script>
+<!-- MODAL CADERNO CONFIG -->
+<div id="caderno-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:3000;align-items:center;justify-content:center">
+  <div style="background:var(--surf);border:2px solid var(--grn);border-radius:10px;padding:20px 22px;width:min(340px,94vw)">
+    <div style="font-family:'Syne',sans-serif;font-size:15px;font-weight:800;color:var(--grn);margin-bottom:14px">📋 Configurar Caderno de Campo</div>
+
+    <label style="display:block;font-size:10px;color:var(--mut);margin-bottom:3px">Ano (prefixo das parcelas)</label>
+    <input id="cad-ano" type="text" value="26" maxlength="4"
+      style="width:100%;background:var(--card);border:1px solid var(--bord);color:var(--txt);
+             font-family:monospace;font-size:13px;padding:7px 9px;border-radius:4px;
+             outline:none;margin-bottom:10px">
+
+    <label style="display:block;font-size:10px;color:var(--mut);margin-bottom:3px">Número inicial da primeira parcela</label>
+    <input id="cad-parc-ini" type="number" value="1" min="1"
+      style="width:100%;background:var(--card);border:1px solid var(--bord);color:var(--txt);
+             font-family:monospace;font-size:13px;padding:7px 9px;border-radius:4px;
+             outline:none;margin-bottom:6px">
+    <div id="cad-parc-preview" style="font-size:10px;color:var(--mut);margin-bottom:14px;line-height:1.7">
+      Prévia: <b style="color:var(--grn)">26-1</b> → <b style="color:var(--grn)">26-N</b>
+    </div>
+
+    <div style="display:flex;gap:8px">
+      <button onclick="document.getElementById('caderno-modal').style.display='none'"
+        style="flex:1;background:var(--card);border:1px solid var(--bord);color:var(--txt);
+               font-family:monospace;font-size:12px;padding:9px;border-radius:5px;cursor:pointer">
+        Cancelar
+      </button>
+      <button onclick="confirmarCaderno()"
+        style="flex:2;background:var(--grn);border:none;color:#07090a;font-family:'Syne',sans-serif;
+               font-weight:800;font-size:13px;padding:9px;border-radius:5px;cursor:pointer">
+        📊 Gerar Planilha
+      </button>
+    </div>
+  </div>
+</div>
+
 <!-- TUTORIAL OVERLAY -->
 <div class="tut-overlay" id="tut-overlay">
   <div class="tut-backdrop" onclick="tutNext()"></div>
