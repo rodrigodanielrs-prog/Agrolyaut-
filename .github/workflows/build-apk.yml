@@ -20,64 +20,97 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Install build tools
+      - name: Install SDK components
         run: |
           yes | sdkmanager --licenses || true
-          sdkmanager "build-tools;34.0.0" "platforms;android-34"
+          sdkmanager "build-tools;34.0.0" "platforms;android-34" "platform-tools"
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
 
-      - name: Install Bubblewrap
-        run: npm install -g @bubblewrap/cli
+      - name: Create Capacitor project
+        run: |
+          npm init -y
+          npm install @capacitor/core @capacitor/cli @capacitor/android
+
+      - name: Configure Capacitor
+        run: |
+          cat > capacitor.config.json << 'CAPEOF'
+          {
+            "appId": "br.edu.setrem.agrolayout",
+            "appName": "AgroLayout",
+            "webDir": "www",
+            "server": {
+              "url": "https://rodrigodanielrs-prog.github.io/Agrolyaut-/",
+              "cleartext": false
+            },
+            "android": {
+              "backgroundColor": "#07090a"
+            }
+          }
+          CAPEOF
+
+      - name: Create web directory
+        run: |
+          mkdir -p www
+          cat > www/index.html << 'WEBEOF'
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <meta http-equiv="refresh" content="0; url=https://rodrigodanielrs-prog.github.io/Agrolyaut-/">
+          </head>
+          <body>Carregando AgroLayout...</body>
+          </html>
+          WEBEOF
+
+      - name: Add Android platform
+        run: npx cap add android
 
       - name: Generate keystore
         run: |
           keytool -genkey -v \
-            -keystore ${{ github.workspace }}/agrolayout.keystore \
+            -keystore agrolayout.keystore \
             -alias agrolayout \
             -keyalg RSA -keysize 2048 -validity 10000 \
             -storepass agrolayout123 \
             -keypass agrolayout123 \
             -dname "CN=AgroLayout, OU=SETREM, O=SETREM, L=Tres de Maio, ST=RS, C=BR"
 
-      - name: Build with Bubblewrap (non-interactive)
+      - name: Configure signing
         run: |
-          bubblewrap init \
-            --manifest "https://rodrigodanielrs-prog.github.io/Agrolyaut-/manifest.json" \
-            --packageId "br.edu.setrem.agrolayout" \
-            --name "AgroLayout" \
-            --shortName "AgroLayout" \
-            --themeColor "#3fb950" \
-            --backgroundColor "#07090a" \
-            --startUrl "https://rodrigodanielrs-prog.github.io/Agrolyaut-/" \
-            --iconUrl "https://rodrigodanielrs-prog.github.io/Agrolyaut-/icon-512-any.png" \
-            --maskableIconUrl "https://rodrigodanielrs-prog.github.io/Agrolyaut-/icon-512-maskable.png" \
-            --signingKeyPath "${{ github.workspace }}/agrolayout.keystore" \
-            --signingKeyAlias "agrolayout" \
-            --signingKeyPassword "agrolayout123" \
-            --signingStorePassword "agrolayout123" \
-            --jdkPath "$JAVA_HOME" \
-            --sdkPath "$ANDROID_SDK_ROOT" \
-            --skipVersionUpgrade
-        env:
-          CI: true
+          cat >> android/app/build.gradle << 'GRADEOF'
+
+          android {
+              signingConfigs {
+                  release {
+                      storeFile file("$rootDir/../agrolayout.keystore")
+                      storePassword "agrolayout123"
+                      keyAlias "agrolayout"
+                      keyPassword "agrolayout123"
+                  }
+              }
+              buildTypes {
+                  release {
+                      signingConfig signingConfigs.release
+                  }
+              }
+          }
+          GRADEOF
 
       - name: Build APK
         run: |
-          bubblewrap build \
-            --skipSigning false
-        env:
-          CI: true
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleRelease
 
-      - name: Find and list APKs
-        run: find ${{ github.workspace }} -name "*.apk" -type f
+      - name: Find APK
+        run: find . -name "*.apk" -type f
 
-      - name: Upload APK artifact
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: AgroLayout-APK
-          path: "**/*.apk"
-          if-no-files-found: warn
+          path: android/app/build/outputs/apk/release/app-release*.apk
+          if-no-files-found: error
