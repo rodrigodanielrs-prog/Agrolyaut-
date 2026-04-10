@@ -60,6 +60,19 @@ jobs:
       - name: Add Android platform
         run: npx cap add android
 
+      - name: Fix Kotlin duplicate classes
+        run: |
+          cat >> android/app/build.gradle << 'GRADEOF'
+
+          configurations.all {
+              resolutionStrategy {
+                  force 'org.jetbrains.kotlin:kotlin-stdlib:1.8.22'
+                  force 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.22'
+                  force 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.22'
+              }
+          }
+          GRADEOF
+
       - name: Generate keystore
         run: |
           keytool -genkey -v \
@@ -70,7 +83,7 @@ jobs:
             -keypass agrolayout123 \
             -dname "CN=AgroLayout, OU=SETREM, O=SETREM, L=Tres de Maio, ST=RS, C=BR"
 
-      - name: Configure signing in gradle
+      - name: Configure signing
         run: |
           cat >> android/app/build.gradle << 'GRADEOF'
 
