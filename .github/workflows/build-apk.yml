@@ -11,10 +11,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Java 17
+      - name: Setup Java 21
         uses: actions/setup-java@v4
         with:
-          java-version: '17'
+          java-version: '21'
           distribution: 'temurin'
 
       - name: Setup Android SDK
@@ -30,7 +30,7 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Create Capacitor project
+      - name: Install Capacitor
         run: |
           npm init -y
           npm install @capacitor/core @capacitor/cli @capacitor/android
@@ -55,15 +55,7 @@ jobs:
       - name: Create web directory
         run: |
           mkdir -p www
-          cat > www/index.html << 'WEBEOF'
-          <!DOCTYPE html>
-          <html>
-          <head>
-            <meta http-equiv="refresh" content="0; url=https://rodrigodanielrs-prog.github.io/Agrolyaut-/">
-          </head>
-          <body>Carregando AgroLayout...</body>
-          </html>
-          WEBEOF
+          echo '<html><body>AgroLayout</body></html>' > www/index.html
 
       - name: Add Android platform
         run: npx cap add android
@@ -78,35 +70,26 @@ jobs:
             -keypass agrolayout123 \
             -dname "CN=AgroLayout, OU=SETREM, O=SETREM, L=Tres de Maio, ST=RS, C=BR"
 
-      - name: Configure signing
+      - name: Configure signing in gradle
         run: |
           cat >> android/app/build.gradle << 'GRADEOF'
 
-          android {
-              signingConfigs {
-                  release {
-                      storeFile file("$rootDir/../agrolayout.keystore")
-                      storePassword "agrolayout123"
-                      keyAlias "agrolayout"
-                      keyPassword "agrolayout123"
-                  }
-              }
-              buildTypes {
-                  release {
-                      signingConfig signingConfigs.release
-                  }
+          android.signingConfigs {
+              release {
+                  storeFile file("$rootDir/../agrolayout.keystore")
+                  storePassword "agrolayout123"
+                  keyAlias "agrolayout"
+                  keyPassword "agrolayout123"
               }
           }
+          android.buildTypes.release.signingConfig = android.signingConfigs.release
           GRADEOF
 
       - name: Build APK
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleRelease
-
-      - name: Find APK
-        run: find . -name "*.apk" -type f
+          ./gradlew assembleRelease --no-daemon
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
