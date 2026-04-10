@@ -35,30 +35,42 @@ jobs:
           npm init -y
           npm install @capacitor/core @capacitor/cli @capacitor/android
 
-      - name: Configure Capacitor
+      - name: Configure Capacitor (local mode - no remote URL)
         run: |
           cat > capacitor.config.json << 'CAPEOF'
           {
             "appId": "br.edu.setrem.agrolayout",
             "appName": "AgroLayout",
             "webDir": "www",
-            "server": {
-              "url": "https://rodrigodanielrs-prog.github.io/Agrolyaut-/",
-              "cleartext": false
-            },
             "android": {
-              "backgroundColor": "#07090a"
+              "backgroundColor": "#07090a",
+              "allowMixedContent": true
+            },
+            "plugins": {
+              "SplashScreen": {
+                "launchShowDuration": 0
+              }
             }
           }
           CAPEOF
 
-      - name: Create web directory
+      - name: Copy app files to www
         run: |
           mkdir -p www
-          echo '<html><body>AgroLayout</body></html>' > www/index.html
+          cp index.html www/index.html
+          cp manifest.json www/manifest.json
+          cp sw.js www/sw.js
+          cp icon-192-any.png www/ 2>/dev/null || true
+          cp icon-512-any.png www/ 2>/dev/null || true
+          cp icon-192-maskable.png www/ 2>/dev/null || true
+          cp icon-512-maskable.png www/ 2>/dev/null || true
 
       - name: Add Android platform
         run: npx cap add android
+
+      - name: Add GPS and storage permissions to AndroidManifest
+        run: |
+          sed -i 's|<uses-permission android:name="android.permission.INTERNET" />|<uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />\n    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />\n    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />|' android/app/src/main/AndroidManifest.xml
 
       - name: Fix Kotlin duplicate classes
         run: |
