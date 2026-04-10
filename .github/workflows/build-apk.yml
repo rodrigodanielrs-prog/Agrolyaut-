@@ -24,8 +24,6 @@ jobs:
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
-        with:
-          cmdline-tools-version: '11076708'
 
       - name: Accept Android licenses
         run: yes | sdkmanager --licenses || true
@@ -48,7 +46,7 @@ jobs:
 
       - name: Initialize Bubblewrap
         run: |
-          bubblewrap init \
+          echo "N" | bubblewrap init \
             --manifest https://rodrigodanielrs-prog.github.io/Agrolyaut-/manifest.json \
             --packageId br.edu.setrem.agrolayout \
             --name AgroLayout \
@@ -62,9 +60,11 @@ jobs:
             --signingKeyAlias agrolayout \
             --signingKeyPassword agrolayout123 \
             --signingStorePassword agrolayout123
+        env:
+          JAVA_HOME: ${{ env.JAVA_HOME }}
 
       - name: Build APK
-        run: bubblewrap build
+        run: echo "N" | bubblewrap build
 
       - name: Find APK
         run: find . -name "*.apk" 2>/dev/null || echo "No APK found"
@@ -73,6 +73,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: AgroLayout-APK
-          path: |
-            **/*.apk
+          path: "**/*.apk"
           if-no-files-found: warn
