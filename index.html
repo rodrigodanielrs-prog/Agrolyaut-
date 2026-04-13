@@ -3146,13 +3146,13 @@ var tutOpen = false;
 
 function tutShow() {
   try {
-    if (localStorage.getItem('agrolayout-tut-never')) return;
-    if (localStorage.getItem('agrolayout-tut-done')) return;
+    if (localStorage.getItem('agrolayout-tut-never') === '1') return;
+    if (localStorage.getItem('agrolayout-tut-done')  === '1') return;
   } catch(e){}
   tutOpen = true;
   tutIdx  = 0;
-  document.getElementById('tut-overlay').classList.add('active');
-  tutRender();
+  var overlay = document.getElementById('tut-overlay');
+  if(overlay) { overlay.classList.add('active'); tutRender(); }
 }
 
 function tutClose() {
@@ -3619,7 +3619,12 @@ window.addEventListener('load',function(){
   } catch(ex){ console.warn('Auto-restore failed:', ex); }
 
   // Só mostra tutorial se usuário não marcou "não mostrar novamente"
-  if(!localStorage.getItem('agrolayout-tut-never')){
+  // Mostra tutorial apenas se nunca dispensado
+  var neverShow = false;
+  try { neverShow = localStorage.getItem('agrolayout-tut-never')==='1'; } catch(e){}
+  var alreadyDone = false;
+  try { alreadyDone = localStorage.getItem('agrolayout-tut-done')==='1'; } catch(e){}
+  if(!neverShow && !alreadyDone){
     setTimeout(tutShow, 800);
   }
 });
@@ -3671,7 +3676,7 @@ window.addEventListener('load',function(){
     </div>
     <div class="tut-check">
       <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:11px;color:var(--mut)">
-        <input type="checkbox" id="tut-no-show" style="width:15px;height:15px;accent-color:var(--grn);cursor:pointer">
+        <input type="checkbox" id="tut-no-show" style="width:15px;height:15px;accent-color:var(--grn);cursor:pointer" onchange="if(this.checked){try{localStorage.setItem('agrolayout-tut-never','1');}catch(e){}}else{try{localStorage.removeItem('agrolayout-tut-never');}catch(e){}}">
         Não mostrar novamente
       </label>
     </div>
