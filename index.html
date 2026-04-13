@@ -1256,7 +1256,8 @@ body{background:var(--bg);color:var(--txt);font-family:var(--fm);font-size:12px;
       <div class="sec">
         <div class="sec-title">Croqui para Impressão</div>
         <p style="font-size:11px;color:var(--mut);margin-bottom:8px;line-height:1.6">Croqui visual colorido, tabela de aleatorização e coordenadas GPS.</p>
-        <button class="btn btn-grn" onclick="printCroqui()">🖨 Gerar Croqui (PDF)</button>
+        <div id="print-exp-sel" style="margin-bottom:8px"></div>
+        <button class="btn btn-grn" onclick="printCroquiSelecionado()">🖨 Gerar Croqui (PDF)</button>
       </div>
       <div class="sec">
         <div class="sec-title">Exportar Experimentos</div>
@@ -1495,6 +1496,7 @@ function goStep(n) {
   if (n!==1) cancelDraw();
   // Re-render panels
   if (n===3) renderVars();
+  if (n===4) renderPrintSel();
   setTimeout(function(){ if(MAP){ MAP.invalidateSize(); } }, 150);
   setTimeout(function(){ if(MAP){ MAP.invalidateSize(); } }, 400);
 }
@@ -1912,6 +1914,7 @@ function drawExp(exp) {
     }
   }
   exp._gj = gj;
+  autoSaveLastProject();
 }
 
 function fitExp(exp) {
@@ -2666,7 +2669,34 @@ function exportXLSX(prefixoAno, parcIni){
   }
 }
 
-function printCroqui(){
+function renderPrintSel(){
+  var el=document.getElementById('print-exp-sel');
+  if(!el) return;
+  if(!exps.length){ el.innerHTML=''; return; }
+  var html='<div style="font-size:10px;color:var(--mut);margin-bottom:5px">Selecionar experimentos:</div>';
+  exps.forEach(function(exp){
+    html+='<label style="display:flex;align-items:center;gap:6px;font-size:11px;'
+      +'color:var(--txt);margin-bottom:4px;cursor:pointer">'
+      +'<input type="checkbox" id="psel-'+exp.id+'" checked '
+      +'style="accent-color:var(--grn);width:14px;height:14px">'
+      +'<span style="width:10px;height:10px;border-radius:50%;background:'+exp.color
+      +';display:inline-block;flex-shrink:0"></span>'
+      +exp.name+'</label>';
+  });
+  el.innerHTML=html;
+}
+
+function printCroquiSelecionado(){
+  var selected=exps.filter(function(exp){
+    var cb=document.getElementById('psel-'+exp.id);
+    return cb && cb.checked && exp._gj && exp._gj.length;
+  });
+  if(!selected.length){ toast('Selecione ao menos um experimento','ty'); return; }
+  printCroqui(selected);
+}
+
+function printCroqui(expList){
+  var eList=expList||exps.filter(function(e){return e.visible&&e._gj&&e._gj.length;});
   var eList = exps.filter(function(e){ return e.visible && e._gj && e._gj.length; });
   if(!eList.length){ toast('Nenhum experimento para imprimir','ty'); return; }
 
@@ -2921,6 +2951,24 @@ function exportCSV(){
 /* ══════════════════════════════════════
    SAVE / LOAD PROJECT
    ══════════════════════════════════════ */
+function autoSaveLastProject(){
+  try {
+    var proj={
+      e1: areaFeats.map(function(f){return{type:f.type,name:f.name,info:f.info,gj:f.gj};}),
+      exps: exps.map(function(exp){return{
+        id:exp.id,name:exp.name,color:exp.color,lat:exp.lat,lng:exp.lng,
+        angle:exp.angle,delin:exp.delin,nTrat:exp.nTrat,nBlocos:exp.nBlocos,
+        nLinhas:exp.nLinhas,espLinhas:exp.espLinhas,pLarg:exp.pLarg,
+        pComp:exp.pComp,espTrat:exp.espTrat,espBlocos:exp.espBlocos,
+        bloco1Fixed:exp.bloco1Fixed,visible:exp.visible,
+        tratNames:exp.tratNames,allocs:exp.allocs
+      };}),
+      vars: vars
+    };
+    localStorage.setItem('agrolayout-last-project', JSON.stringify(proj));
+  } catch(ex){ console.warn('autoSaveLastProject failed:', ex); }
+}
+
 function autoSaveProject(){
   // Save silently to localStorage (no toast, no download)
   try {
@@ -3499,7 +3547,58 @@ window.addEventListener('load',function(){
     }
   } catch(e){}
   // Show tutorial after a short delay
-  setTimeout(tutShow, 800);
+  // Auto-restaurar último projeto salvo
+  try {
+    var lastProj = localStorage.getItem('agrolayout-last-project');
+    if(lastProj) {
+      var proj = JSON.parse(lastProj);
+      // Restaurar área
+      if(proj.e1 && proj.e1.length) {
+        areaFeats=[]; areaLayers=[];
+        proj.e1.forEach(function(fd){
+          var cfg=TOOLS[fd.type]; if(!cfg) return;
+          var lyr=L.geoJSON(fd.gj,{style:{color:cfg.color,weight:cfg.w,
+            dashArray:cfg.dash,fillColor:cfg.color,
+            fillOpacity:cfg.fill?cfg.fo:0}}).addTo(MAP);
+          areaLayers.push(lyr);
+          lyr.bindTooltip('<b style="color:'+cfg.color+'">'+fd.name+'</b>',
+            {permanent:true,direction:'center'});
+          areaFeats.push({id:Date.now()+Math.random(),type:fd.type,
+            layer:lyr,name:fd.name,info:fd.info||'',gj:fd.gj});
+        });
+        renderE1List(); renderE1Summary();
+      }
+      // Restaurar experimentos
+      if(proj.exps && proj.exps.length) {
+        exps=[];
+        proj.exps.forEach(function(d){
+          var exp=newExp(d.lat,d.lng); Object.assign(exp,d);
+          exps.push(exp); addMarker(exp); drawExp(exp);
+        });
+        nextExpId=exps.length?Math.max.apply(null,exps.map(function(e){return e.id;}))+1:1;
+        activeExp=exps.length?exps[0].id:null;
+        renderExpList(); renderExpPanel();
+        // Centralizar mapa no último experimento
+        try {
+          var e=exps[0];
+          MAP.setView([e.lat,e.lng], 18);
+        } catch(ex){}
+      }
+      // Restaurar variáveis
+      if(proj.vars && proj.vars.length) {
+        vars=proj.vars;
+        nextVarId=Math.max.apply(null,vars.map(function(v){return v.id+1;}));
+        renderVars();
+      }
+      if(proj.exps && proj.exps.length)
+        toast('✓ Projeto restaurado automaticamente');
+    }
+  } catch(ex){ console.warn('Auto-restore failed:', ex); }
+
+  // Só mostra tutorial se usuário não marcou "não mostrar novamente"
+  if(!localStorage.getItem('agrolayout-tut-never')){
+    setTimeout(tutShow, 800);
+  }
 });
 </script>
 <!-- MODAL CADERNO CONFIG -->
