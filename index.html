@@ -2999,7 +2999,13 @@ function saveProject(){
     e1:areaFeats.map(function(f){return{type:f.type,name:f.name,info:f.info,gj:f.gj};}),
     exps:exps.map(function(exp){return{id:exp.id,name:exp.name,color:exp.color,lat:exp.lat,lng:exp.lng,angle:exp.angle,delin:exp.delin,nTrat:exp.nTrat,nBlocos:exp.nBlocos,nLinhas:exp.nLinhas,espLinhas:exp.espLinhas,pLarg:exp.pLarg,pComp:exp.pComp,espTrat:exp.espTrat,espBlocos:exp.espBlocos,bloco1Fixed:exp.bloco1Fixed,visible:exp.visible,tratNames:exp.tratNames,allocs:exp.allocs};}),
     vars:vars};
+  // Salva arquivo JSON
   dl('agrolayout.json',JSON.stringify(proj,null,2),'application/json');
+  // Também salva no localStorage como último projeto
+  try {
+    localStorage.setItem('agrolayout-last-project', JSON.stringify(proj));
+    localStorage.setItem('agrolayout-last-save', new Date().toLocaleString('pt-BR'));
+  } catch(e){}
   toast('✓ Projeto salvo!');
 }
 
@@ -3162,11 +3168,15 @@ function tutClose() {
 }
 
 function tutSkip() {
-  // Check if user wants to never see again
   var noShow = document.getElementById('tut-no-show');
-  if (noShow && noShow.checked) {
-    try { localStorage.setItem('agrolayout-tut-never','1'); } catch(e){}
-  }
+  try {
+    // Sempre salva que o tutorial foi dispensado nesta sessão
+    localStorage.setItem('agrolayout-tut-done','1');
+    // Se marcou "não mostrar novamente", salva permanentemente
+    if (noShow && noShow.checked) {
+      localStorage.setItem('agrolayout-tut-never','1');
+    }
+  } catch(e){}
   tutClose();
 }
 
@@ -3186,7 +3196,8 @@ function tutPrev() {
 function showTutAgain() {
   try {
     localStorage.removeItem('agrolayout-tut-done');
-    localStorage.removeItem('agrolayout-tut-never');
+    // NÃO remove tut-never — respeita a preferência do usuário
+    // mas abre uma vez manualmente pelo botão "?"
   } catch(e){}
   tutOpen = true; tutIdx = 0;
   var overlay = document.getElementById('tut-overlay');
@@ -3600,8 +3611,10 @@ window.addEventListener('load',function(){
         nextVarId=Math.max.apply(null,vars.map(function(v){return v.id+1;}));
         renderVars();
       }
-      if(proj.exps && proj.exps.length)
-        toast('✓ Projeto restaurado automaticamente');
+      if(proj.exps && proj.exps.length){
+        var lastSave = localStorage.getItem('agrolayout-last-save');
+        toast('✓ Projeto restaurado' + (lastSave ? ' (salvo em '+lastSave+')' : ''));
+      }
     }
   } catch(ex){ console.warn('Auto-restore failed:', ex); }
 
