@@ -2673,17 +2673,28 @@ function renderPrintSel(){
   var el=document.getElementById('print-exp-sel');
   if(!el) return;
   if(!exps.length){ el.innerHTML=''; return; }
-  var html='<div style="font-size:10px;color:var(--mut);margin-bottom:5px">Selecionar experimentos:</div>';
+  var html='<div style="font-size:10px;color:var(--mut);margin-bottom:4px">Selecionar experimentos para o croqui:</div>';
+  html+='<div style="display:flex;gap:8px;margin-bottom:6px">'
+    +'<button onclick="selAllExp(true)" style="font-size:10px;background:none;border:1px solid var(--bord);color:var(--grn);border-radius:4px;padding:2px 8px;cursor:pointer">✓ Todos</button>'
+    +'<button onclick="selAllExp(false)" style="font-size:10px;background:none;border:1px solid var(--bord);color:var(--mut);border-radius:4px;padding:2px 8px;cursor:pointer">✗ Nenhum</button>'
+    +'</div>';
   exps.forEach(function(exp){
     html+='<label style="display:flex;align-items:center;gap:6px;font-size:11px;'
-      +'color:var(--txt);margin-bottom:4px;cursor:pointer">'
-      +'<input type="checkbox" id="psel-'+exp.id+'" checked '
-      +'style="accent-color:var(--grn);width:14px;height:14px">'
+      +'color:var(--txt);margin-bottom:5px;cursor:pointer">'
+      +'<input type="checkbox" id="psel-'+exp.id+'" '
+      +'style="accent-color:var(--grn);width:15px;height:15px;flex-shrink:0">'
       +'<span style="width:10px;height:10px;border-radius:50%;background:'+exp.color
       +';display:inline-block;flex-shrink:0"></span>'
-      +exp.name+'</label>';
+      +'<span>'+exp.name+'</span></label>';
   });
   el.innerHTML=html;
+}
+
+function selAllExp(val){
+  exps.forEach(function(exp){
+    var cb=document.getElementById('psel-'+exp.id);
+    if(cb) cb.checked=val;
+  });
 }
 
 function printCroquiSelecionado(){
