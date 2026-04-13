@@ -2697,7 +2697,6 @@ function printCroquiSelecionado(){
 
 function printCroqui(expList){
   var eList=expList||exps.filter(function(e){return e.visible&&e._gj&&e._gj.length;});
-  var eList = exps.filter(function(e){ return e.visible && e._gj && e._gj.length; });
   if(!eList.length){ toast('Nenhum experimento para imprimir','ty'); return; }
 
   var PAL_T=['3FB950','64B5F6','FFB74D','F06292','BA68C8','4DD0E1',
