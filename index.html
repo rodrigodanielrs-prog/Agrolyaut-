@@ -710,6 +710,7 @@ body{background:var(--bg);color:var(--txt);font-family:var(--fm);font-size:12px;
 /* ── SIDE PANEL ── */
 .side{width:280px;flex-shrink:0;background:var(--surf);border-right:1px solid var(--bord);display:flex;flex-direction:column;overflow:hidden}
 .side-scroll{flex:1;overflow-y:auto}.side-scroll::-webkit-scrollbar{width:3px}.side-scroll::-webkit-scrollbar-thumb{background:var(--bord)}
+.side-sc{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}.side-sc::-webkit-scrollbar{width:3px}.side-sc::-webkit-scrollbar-thumb{background:var(--bord)}
 .sec{padding:10px 12px;border-bottom:1px solid var(--bord)}
 .sec-title{font-family:var(--fh);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.4px;color:var(--mut);margin-bottom:8px}
 
@@ -1299,7 +1300,7 @@ body{background:var(--bg);color:var(--txt);font-family:var(--fm);font-size:12px;
 
   <!-- ══ P5: HISTÓRICO ══ -->
   <div id="p5" class="side" style="display:none">
-    <div class="side-sc">
+    <div class="side-sc" style="display:flex;flex-direction:column">
       <div class="hist-reg-form">
         <div class="sec-t">Registrar Ensaio Atual</div>
         <input type="text" id="hist-safra"   placeholder="Safra (ex: 2025/26)">
@@ -1312,7 +1313,7 @@ body{background:var(--bg);color:var(--txt);font-family:var(--fm);font-size:12px;
       </div>
       <div class="sec">
         <div class="sec-t">Ensaios Registrados</div>
-        <div id="hist-list"><div class="empty">Nenhum ensaio registrado ainda</div></div>
+        <div id="hist-list" style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;min-height:120px"><div class="empty">Nenhum ensaio registrado ainda</div></div>
       </div>
     </div>
   </div>
@@ -1507,26 +1508,28 @@ function initMap() {
 function goStep(n) {
   STEP = n;
   // Update tab buttons
-  for (var i=1; i<=4; i++) {
+  for (var i=1; i<=5; i++) {
     var b = document.getElementById('tab'+i);
     if (b) b.className = 'tab-btn' + (i===n ? ' tab-active' : (i<n?' tab-done':''));
   }
   // Show panels
-  ['p1','p2','p3','p4'].forEach(function(id,idx){
-    document.getElementById(id).style.display = (idx+1===n) ? 'flex' : 'none';
+  ['p1','p2','p3','p4','p5'].forEach(function(id,idx){
+    var el = document.getElementById(id);
+    if(el) el.style.display = (idx+1===n) ? 'flex' : 'none';
   });
   // Nav buttons
   document.getElementById('btn-prev').disabled = (n===1);
-  document.getElementById('btn-next').disabled = (n===4);
+  document.getElementById('btn-next').disabled = (n===5);
   // Update nav info label
   var labels = ['Área e Terraços','Experimentos','Variáveis','Croqui','Histórico'];
   var ni = document.getElementById('nav-info');
-  if (ni) ni.textContent = 'Etapa ' + n + ' de 4 — ' + labels[n-1];
+  if (ni) ni.textContent = 'Etapa ' + n + ' de 5 — ' + (labels[n-1]||'');
   // Cancel draw if leaving E1
   if (n!==1) cancelDraw();
   // Re-render panels
   if (n===3) renderVars();
   if (n===4) renderPrintSel();
+  if (n===5) renderHist();
   setTimeout(function(){ if(MAP){ MAP.invalidateSize(); } }, 150);
   setTimeout(function(){ if(MAP){ MAP.invalidateSize(); } }, 400);
 }
@@ -1934,7 +1937,16 @@ function addMarker(exp) {
   }).addTo(MAP);
   exp.marker.bindTooltip(exp.name+' — arraste para mover',{direction:'top'});
   exp.marker.on('drag',function(e){
-    exp.lat=e.latlng.lat; exp.lng=e.latlng.lng; drawExp(exp);
+    exp.lat=e.latlng.lat; exp.lng=e.latlng.lng;
+    // Throttle redraw — mobile performance
+    if(exp._dragTimer) return;
+    exp._dragTimer = setTimeout(function(){
+      exp._dragTimer = null;
+      drawExp(exp);
+    }, 60);
+  });
+  exp.marker.on('dragstart',function(){
+    if(exp._dragTimer){ clearTimeout(exp._dragTimer); exp._dragTimer=null; }
   });
   exp.marker.on('dragend',function(){ fitExp(exp); });
   exp.marker.on('click',function(){ selectExp(exp.id); });
@@ -2027,6 +2039,45 @@ function selectExp(id) {
   renderExpPanel();
 }
 
+function duplicateExp(id){
+  var orig = exps.find(function(e){ return e.id===id; });
+  if(!orig) return;
+
+  // Offset new experiment ~30m to the east
+  var offsetM   = 30;
+  var offsetLng = offsetM / (MLAT * Math.cos(orig.lat * Math.PI / 180));
+
+  // Create new exp with copied parameters
+  var newExp_ = newExp(orig.lat, orig.lng + offsetLng);
+  newExp_.name      = orig.name + ' (cópia)';
+  newExp_.delin     = orig.delin;
+  newExp_.nTrat     = orig.nTrat;
+  newExp_.nBlocos   = orig.nBlocos;
+  newExp_.nLinhas   = orig.nLinhas;
+  newExp_.espLinhas = orig.espLinhas;
+  newExp_.pLarg     = orig.pLarg;
+  newExp_.pComp     = orig.pComp;
+  newExp_.espTrat   = orig.espTrat;
+  newExp_.espBlocos = orig.espBlocos;
+  newExp_.angle     = orig.angle;
+  newExp_.bloco1Fixed = orig.bloco1Fixed;
+  newExp_.tratNames = orig.tratNames.slice();
+
+  exps.push(newExp_);
+  activeExp = newExp_.id;
+
+  randomize(newExp_);
+  addMarker(newExp_);
+  drawExp(newExp_);
+
+  renderExpList();
+  renderExpPanel();
+  autoSaveLastProject();
+
+  toast('✓ '+newExp_.name+' criado');
+  setSt('Experimento duplicado — arraste o marcador para reposicionar', true);
+}
+
 function deleteExp(id) {
   for(var i=0;i<exps.length;i++){
     if(exps[i].id===id){
@@ -2081,6 +2132,7 @@ function renderExpList() {
       '<span class="feat-name" onclick="selectExp('+exp.id+')" style="flex:1;cursor:pointer;opacity:'+(vis?'1':'0.5')+'">'+exp.name+'</span>'+
       '<span class="feat-meta" onclick="selectExp('+exp.id+')" style="cursor:pointer">'+(exp.delin==='NONE'?'Grade':exp.delin)+' '+exp.nTrat+'t</span>'+
       '<button class="icon-btn" onclick="event.stopPropagation();centerExp('+exp.id+')" title="Ir para o mapa">🎯</button>'+
+      '<button class="icon-btn" onclick="event.stopPropagation();duplicateExp('+exp.id+')" title="Duplicar experimento">📋</button>'+
       '<button class="del-btn" onclick="event.stopPropagation();deleteExp('+exp.id+')">✕</button>'+
       '</div>';
   }).join('');
@@ -3317,7 +3369,14 @@ function tutClose() {
   var overlay = document.getElementById('tut-overlay');
   overlay.classList.remove('active');
   overlay.style.display = 'none';
-  try { localStorage.setItem('agrolayout-tut-done','1'); } catch(e){}
+  // Sempre salva tut-done + verifica se marcou "não mostrar novamente"
+  try {
+    localStorage.setItem('agrolayout-tut-done','1');
+    var noShow = document.getElementById('tut-no-show');
+    if (noShow && noShow.checked) {
+      localStorage.setItem('agrolayout-tut-never','1');
+    }
+  } catch(e){}
   document.querySelectorAll('.tut-highlight').forEach(function(el){
     el.classList.remove('tut-highlight');
   });
@@ -3351,22 +3410,15 @@ function tutPrev() {
 }
 
 function showTutAgain() {
-  try {
-    localStorage.removeItem('agrolayout-tut-done');
-    // NÃO remove tut-never — respeita a preferência do usuário
-    // mas abre uma vez manualmente pelo botão "?"
-  } catch(e){}
+  // Abre tutorial manualmente sem apagar preferências
   tutOpen = true; tutIdx = 0;
   var overlay = document.getElementById('tut-overlay');
   overlay.style.display = '';
   overlay.classList.add('active');
-  // Restore checkbox state from localStorage
+  // Checkbox reflete estado salvo
   var cb = document.getElementById('tut-no-show');
   if (cb) {
-    var never = false;
-    try { never = localStorage.getItem('agrolayout-tut-never') === '1'; } catch(e){}
-    // Set without triggering onchange (prevents accidental removal of tut-never)
-    cb.checked = never;
+    try { cb.checked = localStorage.getItem('agrolayout-tut-never') === '1'; } catch(e){}
   }
   tutRender();
 }
@@ -3763,6 +3815,8 @@ function renderHist() {
   });
   el.innerHTML = html;
 }
+
+
 
 window.addEventListener('load',function(){
   initMap();
