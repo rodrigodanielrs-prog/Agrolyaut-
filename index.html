@@ -1888,6 +1888,7 @@ function newExp(lat,lng) {
     id:id, name:'Experimento '+id, color:color,
     lat:lat, lng:lng, angle:window._autoAngle||0,
     delin:'DBC', nTrat:2, nBlocos:2,
+    dataSemeadura:'', cultura:'',
     nLinhas:1, espLinhas:0.17,
     pLarg:0.17, pComp:5.0,
     espTrat:0.0, espBlocos:1.0,
@@ -2110,6 +2111,8 @@ function duplicateExp(id){
   newExp_.angle     = orig.angle;
   newExp_.bloco1Fixed = orig.bloco1Fixed;
   newExp_.tratNames = orig.tratNames.slice();
+  newExp_.dataSemeadura = orig.dataSemeadura || '';
+  newExp_.cultura       = orig.cultura || '';
 
   exps.push(newExp_);
   activeExp = newExp_.id;
@@ -2270,6 +2273,19 @@ function renderExpPanel() {
         '<button class="icon-btn" onclick="doRandomize()" title="Nova aleatorização">🔀</button>'+
         '<button class="icon-btn" onclick="toggleVis('+exp.id+')" title="Mostrar/ocultar">'+(exp.visible?'👁':'🚫')+'</button>'+
         '<button class="icon-btn" onclick="fitExp(getExp('+exp.id+'))" title="Zoom">🔍</button>'+
+      '</div>'+
+      // Semeadura + Cultura
+      '<div class="ep-field">'+
+        '<label>🌱 Data de Semeadura</label>'+
+        '<input type="date" class="ep-inp" value="'+(exp.dataSemeadura||'')+'" '+
+          'onchange="onField(this,\'dataSemeadura\','+exp.id+')" '+
+          'style="color-scheme:dark">'+
+      '</div>'+
+      '<div class="ep-field">'+
+        '<label>🌾 Cultura</label>'+
+        '<input type="text" class="ep-inp" value="'+xe(exp.cultura||'')+'" '+
+          'placeholder="Ex: Trigo, Aveia, Canola..." '+
+          'onchange="onField(this,\'cultura\','+exp.id+')">'+
       '</div>'+
       '<div class="ep-field">'+
         '<label>Delineamento</label>'+
@@ -2515,6 +2531,8 @@ function exportXLSX(prefixoAno, parcIni){
     var idRows=[
       [exp.name,'','Largura',exp.pLarg,'m'],
       ['','','Comprimento',exp.pComp,'m'],
+      ['Cultura',exp.cultura||'–','','',''],
+      ['Data de Semeadura',exp.dataSemeadura ? new Date(exp.dataSemeadura+'T12:00').toLocaleDateString('pt-BR') : '–','','',''],
       ['Delineamento',exp.delin==='NONE'?'Sem delineamento':exp.delin,'','',''],
       ['Nº Tratamentos',nT,'','',''],
       ['Nº Blocos',nB,'','',''],
@@ -3238,6 +3256,8 @@ function printCroqui(expList){
 
     html += '<h2>' + exp.name + '</h2>';
     html += '<div class="info-box">'
+      + (exp.cultura ? '<div><span>Cultura: </span><b>' + xe(exp.cultura) + '</b></div>' : '')
+      + (exp.dataSemeadura ? '<div><span>Semeadura: </span><b>' + new Date(exp.dataSemeadura+'T12:00').toLocaleDateString('pt-BR') + '</b></div>' : '')
       + '<div><span>Delineamento: </span><b>' + (exp.delin==='NONE'?'Sem delin.':exp.delin) + '</b></div>'
       + '<div><span>Parcela: </span><b>' + exp.pLarg + ' × ' + exp.pComp + ' m</b></div>'
       + '<div><span>Tratamentos: </span><b>' + nT + '</b></div>'
@@ -3476,7 +3496,7 @@ function autoSaveProject(){
 function saveProject(){
   var proj={version:3,date:new Date().toISOString(),
     e1:areaFeats.map(function(f){return{type:f.type,name:f.name,info:f.info,gj:f.gj};}),
-    exps:exps.map(function(exp){return{id:exp.id,name:exp.name,color:exp.color,lat:exp.lat,lng:exp.lng,angle:exp.angle,delin:exp.delin,nTrat:exp.nTrat,nBlocos:exp.nBlocos,nLinhas:exp.nLinhas,espLinhas:exp.espLinhas,pLarg:exp.pLarg,pComp:exp.pComp,espTrat:exp.espTrat,espBlocos:exp.espBlocos,bloco1Fixed:exp.bloco1Fixed,visible:exp.visible,tratNames:exp.tratNames,allocs:exp.allocs};}),
+    exps:exps.map(function(exp){return{id:exp.id,name:exp.name,color:exp.color,lat:exp.lat,lng:exp.lng,angle:exp.angle,delin:exp.delin,nTrat:exp.nTrat,nBlocos:exp.nBlocos,nLinhas:exp.nLinhas,espLinhas:exp.espLinhas,pLarg:exp.pLarg,pComp:exp.pComp,espTrat:exp.espTrat,espBlocos:exp.espBlocos,bloco1Fixed:exp.bloco1Fixed,visible:exp.visible,tratNames:exp.tratNames,allocs:exp.allocs,dataSemeadura:exp.dataSemeadura,cultura:exp.cultura};}),
     vars:vars};
   var fileName='agrolayout_'+new Date().toISOString().slice(0,10)+'.json';
   // Salva arquivo JSON
@@ -4263,7 +4283,8 @@ function salvarModeloAtual(){
     espTrat:    exp.espTrat,
     espBlocos:  exp.espBlocos,
     bloco1Fixed:exp.bloco1Fixed,
-    tratNames:  exp.tratNames.slice()
+    tratNames:  exp.tratNames.slice(),
+    cultura:    exp.cultura || ''
   };
 
   if(existe){
@@ -4335,6 +4356,8 @@ function usarModelo(modeloId){
   exp.espBlocos  = modelo.espBlocos;
   exp.bloco1Fixed= modelo.bloco1Fixed;
   exp.tratNames  = modelo.tratNames.slice();
+  exp.cultura    = modelo.cultura || '';
+  exp.dataSemeadura = ''; // sempre novo para cada ensaio
 
   randomize(exp);
   exps.push(exp);
