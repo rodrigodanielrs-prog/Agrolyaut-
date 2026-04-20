@@ -1185,6 +1185,12 @@ body{background:var(--bg);color:var(--txt);font-family:var(--fm);font-size:12px;
       </div>
         <div id="exp-list"><div class="empty">Nenhum experimento ainda</div></div>
         <button class="btn btn-grn" style="margin-top:7px" onclick="addExp()">＋ Adicionar Experimento</button>
+        <div style="display:flex;gap:4px;margin-top:4px">
+          <button class="btn btn-ghost" style="flex:1;font-size:11px" onclick="abrirModeloModal('salvar')"
+            title="Salvar experimento atual como modelo reutilizável">💾 Salvar Modelo</button>
+          <button class="btn btn-ghost" style="flex:1;font-size:11px" onclick="abrirModeloModal('carregar')"
+            title="Criar experimento a partir de modelo salvo">📋 Usar Modelo</button>
+        </div>
         <button class="btn btn-ghost" onclick="fitAll()">🔍 Ver todos</button>
         <button class="btn btn-ghost" onclick="checkOverlap()">⚠ Verificar sobreposições</button>
         <div id="overlap-status" style="font-size:10px;padding:4px 2px;line-height:1.5"></div>
@@ -1313,6 +1319,19 @@ body{background:var(--bg);color:var(--txt);font-family:var(--fm);font-size:12px;
       </div>
       <div class="sec">
         <div class="sec-t">Ensaios Registrados</div>
+        <!-- Busca -->
+        <div style="display:flex;gap:6px;margin-bottom:8px">
+          <input type="text" id="hist-search"
+            placeholder="🔍 Buscar por safra, cultura ou local..."
+            oninput="renderHist()"
+            style="flex:1;background:var(--card);border:1px solid var(--bord);
+                   color:var(--txt);border-radius:5px;padding:6px 8px;
+                   font-size:11px;outline:none">
+          <button onclick="document.getElementById('hist-search').value='';renderHist()"
+            title="Limpar busca"
+            style="background:none;border:1px solid var(--bord);color:var(--mut);
+                   border-radius:5px;padding:4px 8px;cursor:pointer;font-size:12px">✕</button>
+        </div>
         <div id="hist-list" style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;min-height:120px"><div class="empty">Nenhum ensaio registrado ainda</div></div>
       </div>
     </div>
@@ -1479,7 +1498,16 @@ function setSt(msg, on) {
 
 /* ── MAP INIT ─────────────────────────── */
 function initMap() {
-  MAP = L.map('map', {zoomControl:true, maxZoom:23, rotate:true, touchRotate:false}).setView([-27.7745,-54.3620], 18);
+  MAP = L.map('map', {
+    zoomControl:         true,
+    maxZoom:             23,
+    rotate:              true,
+    touchRotate:         false,
+    fadeAnimation:       false,
+    zoomAnimation:       false,
+    markerZoomAnimation: false,
+    preferCanvas:        true
+  }).setView([-27.7745,-54.3620], 18);
 
   var tSat = L.tileLayer(
     'https://mt{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
@@ -2197,7 +2225,16 @@ function renderExpPanel() {
   var ha=(bW*tH/10000).toFixed(4);
 
   var tratHtml='';
+  var legendaHtml='';
   for(var i=0;i<exp.nTrat;i++){
+    // Legend pill: colored dot + treatment name
+    var tColor='#'+PAL_T[i%PAL_T.length];
+    legendaHtml+='<div style="display:flex;align-items:center;gap:4px;'+
+      'background:var(--card);border:1px solid var(--bord);border-radius:12px;'+
+      'padding:3px 8px;font-size:10px;color:var(--txt)">'+
+      '<span style="width:8px;height:8px;border-radius:50%;flex-shrink:0;background:'+tColor+'"></span>'+
+      '<span>T'+(i+1)+(exp.tratNames[i]&&exp.tratNames[i]!=='T'+(i+1)?': '+exp.tratNames[i]:'')+'</span>'+
+      '</div>';
     tratHtml+='<div class="trat-row">'+
       '<span class="trat-n">'+(i+1)+'</span>'+
       '<span class="trat-dot" style="background:'+PAL[i%PAL.length]+'"></span>'+
@@ -2260,6 +2297,10 @@ function renderExpPanel() {
     '<div class="ep-section">'+
       '<div class="ep-sec-title">Nomes dos Tratamentos</div>'+
       '<div class="trat-grid">'+tratHtml+'</div>'+
+    '</div>'+
+    '<div class="ep-section">'+
+      '<div class="ep-sec-title">Legenda de Tratamentos</div>'+
+      '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px">'+legendaHtml+'</div>'+
     '</div>';
 }
 
@@ -2825,7 +2866,24 @@ function exportXLSX(prefixoAno, parcIni){
         resRows.push(row);
       });
 
+      // ── CV% GERAL (todos os tratamentos juntos) ─────────
       resRows.push([]);
+      resRows.push(['── CV% Geral (todos os tratamentos) ──']);
+      var cvGeralRow = ['CV% Geral','Coef. variação geral (%)'];
+      cvGeralRow.push({f:'IFERROR(STDEV('+vRef+')/AVERAGE('+vRef+')*100,"–")'});
+      resRows.push(cvGeralRow);
+
+      // ── ALERTA CV ────────────────────────────────────────
+      resRows.push([]);
+      var alertaRow = ['⚠ Diagnóstico CV',''];
+      for(var t=0;t<nT;t++){
+        var crit='"T"&'+(t+1);
+        alertaRow.push({f:'IFERROR(IF(STDEV(IF('+cRef+'='+crit+','+vRef+'))/AVERAGEIF('+cRef+','+crit+','+vRef+')*100>20,"⚠ CV alto (>20%)",IF(STDEV(IF('+cRef+'='+crit+','+vRef+'))/AVERAGEIF('+cRef+','+crit+','+vRef+')*100>10,"⚡ CV médio (10-20%)","✓ CV ok (<10%)")),"")'});
+      }
+      resRows.push(alertaRow);
+
+      resRows.push([]);
+      resRows.push(['Dica: CV% > 20% indica alta variabilidade — revisar delineamento, homogeneidade do solo ou técnica de coleta.']);
       resRows.push(['Dica: após gerar o gráfico, clique com botão direito → Formatar série → mostrar pontos individuais (outliers)']);
 
       var wsRes=XLSX.utils.aoa_to_sheet(resRows);
@@ -2833,6 +2891,138 @@ function exportXLSX(prefixoAno, parcIni){
       for(var t=0;t<nT;t++) resCols.push({wch:16});
       wsRes['!cols']=resCols;
       XLSX.utils.book_append_sheet(wb,wsRes,('E'+exps.indexOf(exp)+'R'+(vi+1)+'_'+vr.name).slice(0,31));
+
+      // ══ ANOVA — Análise de Variância ════════════════════════
+      // Só gera para DBC ou DIC (não para Grade sem blocos definidos)
+      if(exp.delin === 'DBC' || exp.delin === 'DIC'){
+        var anovaRows = [];
+        anovaRows.push(['ANOVA — ' + vr.name + (vr.unit?' ('+vr.unit+')':'') + ' — ' + exp.name]);
+        anovaRows.push([]);
+        anovaRows.push(['Delineamento', exp.delin, '', '', '', '', '']);
+        anovaRows.push(['Nº Tratamentos', nT, '', '', '', '', '']);
+        anovaRows.push(['Nº Blocos',     exp.delin==='DBC' ? nB : '—', '', '', '', '', '']);
+        anovaRows.push(['Nº Parcelas',   nP, '', '', '', '', '']);
+        anovaRows.push([]);
+
+        // Graus de Liberdade
+        var glTrat = nT - 1;
+        var glBloc = exp.delin==='DBC' ? (nB - 1) : 0;
+        var glRes  = exp.delin==='DBC'
+                     ? (nT-1)*(nB-1)
+                     : (nT*nB - nT);  // DIC: N - k
+        var glTot  = nP - 1;
+
+        // Fórmulas que o Excel calcula a partir dos dados preenchidos
+        // SQ Total = DEVSQ(todos valores)
+        var sqTotF = 'DEVSQ('+vRef+')';
+
+        // SQ Tratamento = SUMPRODUCT((nBlocosPorTrat) × (médiaTrat - médiaGeral)²)
+        // Usa a estrutura do Sisvar: média por tratamento × n replicações
+        // Como temos COUNTIF/AVERAGEIF disponíveis, fazemos:
+        var sqTratParts = [];
+        for(var t=0; t<nT; t++){
+          var crit = '"T"&'+(t+1);
+          sqTratParts.push('COUNTIF('+cRef+','+crit+')*(AVERAGEIF('+cRef+','+crit+','+vRef+')-AVERAGE('+vRef+'))^2');
+        }
+        var sqTratF = sqTratParts.join('+');
+
+        // SQ Bloco (só DBC) — similar lógica com referência de bloco
+        var bRef = "'"+shClt+"'!$B$5:$B$"+(4+nP);
+        var sqBlocParts = [];
+        if(exp.delin === 'DBC'){
+          for(var b=1; b<=nB; b++){
+            sqBlocParts.push('COUNTIF('+bRef+','+b+')*(AVERAGEIF('+bRef+','+b+','+vRef+')-AVERAGE('+vRef+'))^2');
+          }
+        }
+        var sqBlocF = sqBlocParts.join('+') || '0';
+
+        // Cabeçalho da tabela ANOVA
+        anovaRows.push(['Fonte de Variação','GL','SQ','QM','F calc.','F tab. (5%)','p-valor']);
+
+        // Linha Tratamento
+        var rTrat = anovaRows.length;
+        anovaRows.push([
+          'Tratamento',
+          glTrat,
+          {f: sqTratF},
+          {f: 'C'+(rTrat+1)+'/B'+(rTrat+1)},  // QM = SQ/GL
+          '', '', ''  // F e p preenchidos depois (precisa da linha Resíduo)
+        ]);
+
+        // Linha Bloco (só DBC)
+        var rBloc = anovaRows.length;
+        if(exp.delin === 'DBC'){
+          anovaRows.push([
+            'Bloco',
+            glBloc,
+            {f: sqBlocF},
+            {f: 'C'+(rBloc+1)+'/B'+(rBloc+1)},
+            '', '', ''
+          ]);
+        }
+
+        // Linha Resíduo = SQ Total - SQ Trat - (SQ Bloc)
+        var rRes = anovaRows.length;
+        var sqResF = exp.delin==='DBC'
+          ? 'C'+(rTrat+1)+'+C'+(rBloc+1)
+          : 'C'+(rTrat+1);
+        anovaRows.push([
+          'Resíduo',
+          glRes,
+          {f: sqTotF+'-('+sqResF+')'},
+          {f: 'C'+(rRes+1)+'/B'+(rRes+1)},
+          '', '', ''
+        ]);
+
+        // Preenche F calc e p-valor para Tratamento
+        var qmTratCell = 'D'+(rTrat+1);
+        var qmResCell  = 'D'+(rRes+1);
+        anovaRows[rTrat][4] = {f: qmTratCell+'/'+qmResCell};
+        anovaRows[rTrat][5] = {f: 'F.INV.RT(0.05,'+glTrat+','+glRes+')'};
+        anovaRows[rTrat][6] = {f: 'F.DIST.RT('+qmTratCell+'/'+qmResCell+','+glTrat+','+glRes+')'};
+
+        // F calc e p-valor para Bloco (DBC)
+        if(exp.delin === 'DBC'){
+          var qmBlocCell = 'D'+(rBloc+1);
+          anovaRows[rBloc][4] = {f: qmBlocCell+'/'+qmResCell};
+          anovaRows[rBloc][5] = {f: 'F.INV.RT(0.05,'+glBloc+','+glRes+')'};
+          anovaRows[rBloc][6] = {f: 'F.DIST.RT('+qmBlocCell+'/'+qmResCell+','+glBloc+','+glRes+')'};
+        }
+
+        // Linha Total
+        anovaRows.push([
+          'Total',
+          glTot,
+          {f: sqTotF},
+          '', '', '', ''
+        ]);
+
+        anovaRows.push([]);
+        // CV% geral
+        anovaRows.push([
+          'CV (%)',
+          '',
+          {f: 'SQRT('+qmResCell+')/AVERAGE('+vRef+')*100'},
+          '', '', '', ''
+        ]);
+        anovaRows.push(['Média Geral','',{f:'AVERAGE('+vRef+')'},'','','','']);
+
+        anovaRows.push([]);
+        anovaRows.push(['── Interpretação ──────────────────────────────────']);
+        anovaRows.push(['Se p-valor < 0.05: efeito significativo do fator sobre a variável.']);
+        anovaRows.push(['Se F calc. > F tab.: efeito significativo (mesma conclusão).']);
+        anovaRows.push(['CV% < 10%: ótima precisão · 10-20%: boa · 20-30%: aceitável · >30%: revisar ensaio.']);
+        anovaRows.push([]);
+        anovaRows.push(['⚠ Esta ANOVA usa fórmulas do Excel — os valores atualizam automaticamente']);
+        anovaRows.push(['   quando você preencher os dados na aba de Coleta do experimento.']);
+        anovaRows.push(['   Para análise definitiva (Tukey, Scott-Knott etc), use Sisvar/R com a']);
+        anovaRows.push(['   Planilha de Análise gerada neste mesmo arquivo.']);
+
+        var wsAn = XLSX.utils.aoa_to_sheet(anovaRows);
+        wsAn['!cols'] = [{wch:20},{wch:8},{wch:14},{wch:14},{wch:12},{wch:14},{wch:14}];
+        var anovaSheetName = ('E'+exps.indexOf(exp)+'A'+(vi+1)+'_'+vr.name).slice(0,31);
+        XLSX.utils.book_append_sheet(wb, wsAn, anovaSheetName);
+      }
     });
 
     parcIni += nP; // next experiment starts after this one
@@ -2843,6 +3033,65 @@ function exportXLSX(prefixoAno, parcIni){
     var wbout = XLSX.write(wb, {bookType:'xlsx', type:'array'});
     var blob  = new Blob([wbout], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
     var url   = URL.createObjectURL(blob);
+    // ══ PLANILHA DE ANÁLISE ════════════════════════════════════
+    // Formato: uma linha por parcela, colunas por variável
+    // Ordenado por Tratamento > Bloco — pronto para colar em R, Sisvar, etc.
+    exps.forEach(function(exp, ei){
+      if(!exp._gj || !exp._gj.length) return;
+      var nB = exp.delin==='NONE'?1:exp.nBlocos;
+      var nT = exp.nTrat;
+
+      // Header: Parcela | Bloco | Tratamento | Nome Trat | Var1 | Var2...
+      var hdr = ['Parcela','Bloco','Tratamento','Nome Tratamento'];
+      vars.forEach(function(vr){ hdr.push(vr.name + (vr.unit?' ('+vr.unit+')':'')); });
+      var rows = [hdr];
+
+      // Build rows sorted by Tratamento, then Bloco
+      var parcelas = [];
+      var pN = 1;
+      for(var b=0; b<nB; b++){
+        for(var t=0; t<nT; t++){
+          var tIdx = exp.allocs ? exp.allocs[b][t] : t;
+          parcelas.push({
+            parc: prefixoAno+'-'+(parcIni+pN-1),
+            bloco: exp.delin!=='NONE' ? b+1 : 1,
+            trat: tIdx+1,
+            nome: exp.tratNames[tIdx]||('T'+(tIdx+1))
+          });
+          pN++;
+        }
+      }
+
+      // Sort by tratamento, then bloco
+      parcelas.sort(function(a,b){
+        if(a.trat !== b.trat) return a.trat - b.trat;
+        return a.bloco - b.bloco;
+      });
+
+      parcelas.forEach(function(p){
+        var row = [p.parc, p.bloco, p.trat, p.nome];
+        vars.forEach(function(){ row.push(''); });
+        rows.push(row);
+      });
+
+      var wsAn = XLSX.utils.aoa_to_sheet(rows);
+
+      // Style header
+      rows[0].forEach(function(_,ci){
+        var cell = wsAn[XLSX.utils.encode_cell({r:0,c:ci})];
+        if(cell) cell.s = {font:{bold:true},fill:{fgColor:{rgb:'1A4D2B'}},
+          font:{bold:true,color:{rgb:'FFFFFF'}}};
+      });
+
+      // Column widths
+      wsAn['!cols'] = [{wch:12},{wch:8},{wch:12},{wch:22}].concat(
+        vars.map(function(){ return {wch:16}; })
+      );
+
+      var sheetName = ('E'+(ei+1)+'_Análise').substring(0,31);
+      XLSX.utils.book_append_sheet(wb, wsAn, sheetName);
+    });
+
     var a     = document.createElement('a');
     a.href    = url;
     a.download= 'caderno_campo_agrolayout.xlsx';
@@ -3787,6 +4036,23 @@ function renderHist() {
     return;
   }
 
+  // Filter by search term
+  var searchEl = document.getElementById('hist-search');
+  var term = searchEl ? searchEl.value.trim().toLowerCase() : '';
+  if(term){
+    list = list.filter(function(e){
+      return (e.safra    ||'').toLowerCase().indexOf(term) >= 0 ||
+             (e.cultura  ||'').toLowerCase().indexOf(term) >= 0 ||
+             (e.local    ||'').toLowerCase().indexOf(term) >= 0 ||
+             (e.nome     ||'').toLowerCase().indexOf(term) >= 0;
+    });
+  }
+
+  if(!list.length){
+    el.innerHTML = '<div class="empty">Nenhum ensaio encontrado para "'+term+'"</div>';
+    return;
+  }
+
   // Group by safra
   var safras = {};
   list.forEach(function(e){
@@ -3817,6 +4083,186 @@ function renderHist() {
 }
 
 
+
+
+/* ══════════════════════════════════════════════════════════════
+   MODELOS DE ENSAIO — salvar e reutilizar configurações
+   ══════════════════════════════════════════════════════════════ */
+
+function modeloLoad(){
+  try { return JSON.parse(localStorage.getItem('agrolayout-modelos') || '[]'); }
+  catch(e){ return []; }
+}
+
+function modeloSave(list){
+  try { localStorage.setItem('agrolayout-modelos', JSON.stringify(list)); }
+  catch(e){ toast('Erro ao salvar modelo','tr'); }
+}
+
+function abrirModeloModal(modo){
+  var modal = document.getElementById('modelo-modal');
+  var sal   = document.getElementById('modelo-salvar');
+  var car   = document.getElementById('modelo-carregar');
+  var tit   = document.getElementById('modelo-title');
+
+  if(modo === 'salvar'){
+    var exp = getExp(activeExp);
+    if(!exp){
+      toast('Selecione um experimento para salvar como modelo','ty');
+      return;
+    }
+    tit.textContent = '💾 Salvar Modelo de Ensaio';
+    sal.style.display = '';
+    car.style.display = 'none';
+    document.getElementById('modelo-nome').value = exp.name;
+    document.getElementById('modelo-desc').value = '';
+    document.getElementById('modelo-preview').innerHTML =
+      '<b style="color:var(--grn)">Parâmetros que serão salvos:</b><br>' +
+      '• Delineamento: <b>'+(exp.delin==='NONE'?'Sem delin.':exp.delin)+'</b><br>' +
+      '• '+exp.nTrat+' tratamentos × '+(exp.delin==='NONE'?1:exp.nBlocos)+' blocos<br>' +
+      '• Parcela: '+exp.pLarg+'m × '+exp.pComp+'m<br>' +
+      '• Linhas: '+exp.nLinhas+' ('+exp.espLinhas+'m)<br>' +
+      '• Esp. trat: '+exp.espTrat+'m · Esp. blocos: '+exp.espBlocos+'m<br>' +
+      '• Nomes dos tratamentos';
+  } else {
+    tit.textContent = '📋 Modelos Salvos';
+    sal.style.display = 'none';
+    car.style.display = '';
+    renderModeloLista();
+  }
+  modal.style.display = 'flex';
+}
+
+function fecharModeloModal(){
+  document.getElementById('modelo-modal').style.display = 'none';
+}
+
+function salvarModeloAtual(){
+  var exp = getExp(activeExp);
+  if(!exp) return;
+
+  var nome = document.getElementById('modelo-nome').value.trim();
+  if(!nome){ toast('Informe um nome para o modelo','ty'); return; }
+
+  var desc = document.getElementById('modelo-desc').value.trim();
+
+  var lista = modeloLoad();
+
+  // Check duplicate name
+  var existe = lista.find(function(m){ return m.nome === nome; });
+  if(existe && !confirm('Já existe um modelo com esse nome. Deseja sobrescrever?')) return;
+
+  var modelo = {
+    id:         Date.now(),
+    nome:       nome,
+    desc:       desc,
+    criado:     new Date().toLocaleDateString('pt-BR'),
+    // Parâmetros do ensaio
+    delin:      exp.delin,
+    nTrat:      exp.nTrat,
+    nBlocos:    exp.nBlocos,
+    nLinhas:    exp.nLinhas,
+    espLinhas:  exp.espLinhas,
+    pLarg:      exp.pLarg,
+    pComp:      exp.pComp,
+    espTrat:    exp.espTrat,
+    espBlocos:  exp.espBlocos,
+    bloco1Fixed:exp.bloco1Fixed,
+    tratNames:  exp.tratNames.slice()
+  };
+
+  if(existe){
+    lista = lista.map(function(m){ return m.nome === nome ? modelo : m; });
+  } else {
+    lista.push(modelo);
+  }
+  modeloSave(lista);
+
+  toast('✓ Modelo "'+nome+'" salvo');
+  fecharModeloModal();
+}
+
+function renderModeloLista(){
+  var el = document.getElementById('modelo-lista');
+  var lista = modeloLoad();
+
+  if(!lista.length){
+    el.innerHTML = '<div style="text-align:center;padding:30px 10px;color:var(--mut);font-size:12px">'+
+      'Nenhum modelo salvo ainda.<br><br>' +
+      '<span style="font-size:10px">Configure um experimento e clique em "💾 Salvar Modelo" para criar seu primeiro modelo reutilizável.</span>'+
+      '</div>';
+    return;
+  }
+
+  el.innerHTML = lista.map(function(m){
+    return '<div style="background:var(--card);border:1px solid var(--bord);border-radius:6px;'+
+      'padding:10px 12px;margin-bottom:6px">'+
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">'+
+        '<div style="flex:1">'+
+          '<div style="font-weight:700;color:var(--grn);font-size:12px">'+xe(m.nome)+'</div>'+
+          (m.desc ? '<div style="font-size:10px;color:var(--mut);margin-top:2px">'+xe(m.desc)+'</div>' : '')+
+        '</div>'+
+        '<button onclick="usarModelo('+m.id+')" title="Criar experimento a partir deste modelo" '+
+          'style="background:var(--grn);border:none;color:#07090a;font-weight:700;font-size:11px;'+
+          'padding:5px 10px;border-radius:4px;cursor:pointer">＋ Usar</button>'+
+        '<button onclick="deletarModelo('+m.id+')" title="Excluir modelo" '+
+          'style="background:none;border:1px solid var(--red);color:var(--red);font-size:11px;'+
+          'padding:5px 8px;border-radius:4px;cursor:pointer">✕</button>'+
+      '</div>'+
+      '<div style="font-size:10px;color:var(--mut);margin-top:6px">'+
+        (m.delin==='NONE'?'Sem delin.':m.delin)+' · '+
+        m.nTrat+'T × '+(m.delin==='NONE'?1:m.nBlocos)+'B · '+
+        m.pLarg+'×'+m.pComp+'m · criado '+m.criado+
+      '</div>'+
+      '</div>';
+  }).join('');
+}
+
+function usarModelo(modeloId){
+  var lista  = modeloLoad();
+  var modelo = lista.find(function(m){ return m.id === modeloId; });
+  if(!modelo){ toast('Modelo não encontrado','tr'); return; }
+
+  // Cria novo experimento no centro da área
+  var pos    = getAreaCenter();
+  var exp    = newExp(pos.lat, pos.lng);
+
+  // Aplica parâmetros do modelo
+  exp.name       = modelo.nome + ' (cópia)';
+  exp.delin      = modelo.delin;
+  exp.nTrat      = modelo.nTrat;
+  exp.nBlocos    = modelo.nBlocos;
+  exp.nLinhas    = modelo.nLinhas;
+  exp.espLinhas  = modelo.espLinhas;
+  exp.pLarg      = modelo.pLarg;
+  exp.pComp      = modelo.pComp;
+  exp.espTrat    = modelo.espTrat;
+  exp.espBlocos  = modelo.espBlocos;
+  exp.bloco1Fixed= modelo.bloco1Fixed;
+  exp.tratNames  = modelo.tratNames.slice();
+
+  randomize(exp);
+  exps.push(exp);
+  activeExp = exp.id;
+  addMarker(exp);
+  drawExp(exp);
+  fitExp(exp);
+  renderExpList();
+  renderExpPanel();
+  autoSaveLastProject();
+
+  fecharModeloModal();
+  toast('✓ Experimento criado a partir do modelo "'+modelo.nome+'"');
+  setSt(exp.name+' — arraste o marcador para reposicionar', true);
+}
+
+function deletarModelo(modeloId){
+  if(!confirm('Excluir este modelo permanentemente?')) return;
+  var lista = modeloLoad().filter(function(m){ return m.id !== modeloId; });
+  modeloSave(lista);
+  renderModeloLista();
+  toast('Modelo excluído');
+}
 
 window.addEventListener('load',function(){
   initMap();
@@ -3913,6 +4359,47 @@ window.addEventListener('load',function(){
         style="flex:2;background:var(--grn);border:none;color:#07090a;font-family:'Syne',sans-serif;font-weight:800;font-size:13px;padding:9px;border-radius:5px;cursor:pointer">
         ✓ Restaurar
       </button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL MODELOS DE ENSAIO -->
+<div id="modelo-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:3000;align-items:center;justify-content:center">
+  <div style="background:var(--surf);border:2px solid var(--grn);border-radius:10px;padding:20px 22px;width:min(400px,94vw);max-height:85vh;overflow-y:auto">
+    <div id="modelo-title" style="font-family:'Syne',sans-serif;font-size:15px;font-weight:800;color:var(--grn);margin-bottom:14px">📋 Modelos de Ensaio</div>
+
+    <!-- Modo SALVAR -->
+    <div id="modelo-salvar" style="display:none">
+      <div style="font-size:11px;color:var(--mut);margin-bottom:6px">Nome do modelo:</div>
+      <input id="modelo-nome" type="text" placeholder="Ex: VCU Trigo Padrão, DHE Canola..."
+        style="width:100%;background:var(--card);border:1px solid var(--bord);color:var(--txt);
+               font-size:13px;padding:8px 10px;border-radius:5px;outline:none;margin-bottom:10px">
+      <div style="font-size:11px;color:var(--mut);margin-bottom:6px">Descrição (opcional):</div>
+      <textarea id="modelo-desc" placeholder="Ex: Protocolo padrão VCU trigo com 22 tratamentos, 4 blocos..."
+        style="width:100%;background:var(--card);border:1px solid var(--bord);color:var(--txt);
+               font-size:11px;padding:8px 10px;border-radius:5px;outline:none;margin-bottom:14px;
+               min-height:60px;resize:vertical;font-family:inherit"></textarea>
+      <div id="modelo-preview" style="font-size:11px;color:var(--mut);background:var(--card);
+           padding:8px 10px;border-radius:5px;margin-bottom:14px;line-height:1.6"></div>
+      <div style="display:flex;gap:8px">
+        <button onclick="fecharModeloModal()"
+          style="flex:1;background:var(--card);border:1px solid var(--bord);color:var(--txt);
+                 font-size:12px;padding:9px;border-radius:5px;cursor:pointer">Cancelar</button>
+        <button onclick="salvarModeloAtual()"
+          style="flex:2;background:var(--grn);border:none;color:#07090a;font-family:'Syne',sans-serif;
+                 font-weight:800;font-size:13px;padding:9px;border-radius:5px;cursor:pointer">
+          💾 Salvar Modelo</button>
+      </div>
+    </div>
+
+    <!-- Modo CARREGAR -->
+    <div id="modelo-carregar" style="display:none">
+      <div id="modelo-lista" style="max-height:400px;overflow-y:auto;margin-bottom:14px"></div>
+      <div style="display:flex;gap:8px">
+        <button onclick="fecharModeloModal()"
+          style="flex:1;background:var(--card);border:1px solid var(--bord);color:var(--txt);
+                 font-size:12px;padding:9px;border-radius:5px;cursor:pointer">Fechar</button>
+      </div>
     </div>
   </div>
 </div>
