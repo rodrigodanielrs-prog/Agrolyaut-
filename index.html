@@ -3470,9 +3470,11 @@ function autoSaveLastProject(){
         nLinhas:exp.nLinhas,espLinhas:exp.espLinhas,pLarg:exp.pLarg,
         pComp:exp.pComp,espTrat:exp.espTrat,espBlocos:exp.espBlocos,
         bloco1Fixed:exp.bloco1Fixed,visible:exp.visible,
-        tratNames:exp.tratNames,allocs:exp.allocs
+        tratNames:exp.tratNames,allocs:exp.allocs,
+        dataSemeadura:exp.dataSemeadura,cultura:exp.cultura
       };}),
-      vars: vars
+      vars: vars,
+      coleta: (typeof coletaLoad === 'function' ? coletaLoad() : {})
     };
     localStorage.setItem('agrolayout-last-project', JSON.stringify(proj));
   } catch(ex){ console.warn('autoSaveLastProject failed:', ex); }
@@ -4743,7 +4745,8 @@ function coletaNext(){
 window.addEventListener('load',function(){
   initMap();
   goStep(1);
-  geoLocate(true);
+  // GPS não é chamado automaticamente — usuário aciona pelo botão 📍
+  // geoLocate(true);
   // Rotação: botão direito + arrastar
   // Restore auto-saved session if exists
   try {
