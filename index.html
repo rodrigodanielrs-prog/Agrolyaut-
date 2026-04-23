@@ -1117,7 +1117,7 @@ body{background:var(--bg);color:var(--txt);font-family:var(--fm);font-size:12px;
     <div class="logo">Agro<span>Layout</span></div>
     <div class="hsp"></div>
     <button class="icon-btn" onclick="loadProject()" title="Carregar projeto">📂</button>
-    <button class="icon-btn" onclick="saveProject()" title="Salvar projeto">💾</button>
+    <button class="icon-btn" id="save-btn" onclick="saveProject()" title="Salvar projeto">💾</button>
     <button class="icon-btn" onclick="showTutAgain()" title="Ajuda / Tutorial" style="color:var(--grn);font-weight:700;font-size:14px">?</button>
   </div>
   <div class="tabs">
@@ -1776,7 +1776,7 @@ function importGJ() {
           }
           if(gj.vars){vars=gj.vars;nextVarId=vars.length?Math.max.apply(null,vars.map(function(v){return v.id;}))+1:7;renderVars();}
           try{MAP.fitBounds(L.featureGroup(areaLayers).getBounds(),{padding:[40,40]});}catch(ex){}
-          toast('✓ Projeto carregado!');
+          _dirtyFlag = false; updateSaveIndicator(); toast('✓ Projeto carregado!');
           return;
         }
         areaFeats.forEach(function(f){MAP.removeLayer(f.layer);});
@@ -1820,7 +1820,7 @@ function restoreLastProject(){
     if(!saved){toast('Nenhum projeto salvo','ty');return;}
     var proj=JSON.parse(saved);
     loadProjectData(proj);
-    toast('✓ Projeto restaurado!');
+    _dirtyFlag = false; updateSaveIndicator(); toast('✓ Projeto restaurado!');
   }catch(e){ toast('Erro ao restaurar','tr'); }
 }
 
@@ -2423,6 +2423,7 @@ function checkOverlap(){
    ══════════════════════════════════════ */
 var vars = [];
 var nextVarId = 1;
+var _dirtyFlag = false;  // true = há alterações não salvas
 
 function renderVars(){
   var el=document.getElementById('var-list');
@@ -2456,6 +2457,7 @@ function addVar(){
   document.getElementById('v-sub').value='1';
   renderVars();
   autoSaveProject();
+  _dirtyFlag = true;
   toast('✓ Variável adicionada');
 }
 
@@ -3494,6 +3496,8 @@ function autoSaveLastProject(){
       coleta: (typeof coletaLoad === 'function' ? coletaLoad() : {})
     };
     localStorage.setItem('agrolayout-last-project', JSON.stringify(proj));
+    _dirtyFlag = true;
+    updateSaveIndicator();
   } catch(ex){ console.warn('autoSaveLastProject failed:', ex); }
 }
 
@@ -3526,6 +3530,8 @@ function saveProject(){
     localStorage.setItem('agrolayout-last-save', new Date().toLocaleString('pt-BR'));
     localStorage.setItem('agrolayout-last-filename', fileName);
   } catch(e){}
+  _dirtyFlag = false;
+  updateSaveIndicator();
   toast('✓ Projeto salvo: '+fileName);
 }
 
@@ -4728,6 +4734,28 @@ function coletaNext(){
 
   coletaRender();
 }
+
+
+function updateSaveIndicator(){
+  var btn = document.getElementById('save-btn');
+  if(!btn) return;
+  if(_dirtyFlag){
+    btn.style.outline = '2px solid var(--yel)';
+    btn.title = 'Salvar projeto (alterações não salvas)';
+  } else {
+    btn.style.outline = '';
+    btn.title = 'Salvar projeto';
+  }
+}
+
+// Aviso ao fechar/recarregar com alterações não salvas
+window.addEventListener('beforeunload', function(e){
+  if(_dirtyFlag){
+    e.preventDefault();
+    e.returnValue = 'Há alterações não salvas. Deseja sair sem salvar?';
+    return e.returnValue;
+  }
+});
 
 window.addEventListener('load',function(){
   initMap();
