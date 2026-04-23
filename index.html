@@ -1992,6 +1992,7 @@ function addMarker(exp) {
 }
 
 function drawExp(exp) {
+  try {
   exp.layers.forEach(function(l){MAP.removeLayer(l);}); exp.layers=[];
   if (!exp.visible) return;
   calcPLarg(exp);
@@ -2024,6 +2025,10 @@ function drawExp(exp) {
     }
     // Plots
     for(var t=0;t<exp.nTrat;t++){
+      // Guard: if allocs missing or incomplete, re-randomize
+      if(!exp.allocs || !exp.allocs[b] || exp.allocs[b][t] === undefined){
+        randomize(exp);
+      }
       var tIdx=exp.allocs[b][t];
       var color=PAL[tIdx%PAL.length];
       var nm=exp.tratNames[tIdx]||('T'+(tIdx+1));
@@ -2060,6 +2065,7 @@ function drawExp(exp) {
   }
   exp._gj = gj;
   autoSaveLastProject();
+  } catch(e){ console.warn('drawExp error (exp '+exp.id+'):', e.message); }
 }
 
 function fitExp(exp) {
@@ -2722,7 +2728,11 @@ function exportXLSX(prefixoAno, parcIni){
       gc(cr,rightBord,pLarg.toFixed(2),sty('EEEEEE','999999',false,7));
 
       for(var t=0;t<nT;t++){
-        var tIdx=exp.allocs[b][t];
+        // Guard: if allocs missing or incomplete, re-randomize
+      if(!exp.allocs || !exp.allocs[b] || exp.allocs[b][t] === undefined){
+        randomize(exp);
+      }
+      var tIdx=exp.allocs[b][t];
         var tNm=exp.tratNames[tIdx]||('T'+(tIdx+1));
         var bgT2=PAL_BG[tIdx%PAL_BG.length];
         var dkT2=PAL_DRK[tIdx%PAL_DRK.length];
@@ -2822,7 +2832,11 @@ function exportXLSX(prefixoAno, parcIni){
       var pN=1;
       for(var b=0;b<nB;b++){
         for(var t=0;t<nT;t++){
-          var tIdx=exp.allocs[b][t];
+          // Guard: if allocs missing or incomplete, re-randomize
+      if(!exp.allocs || !exp.allocs[b] || exp.allocs[b][t] === undefined){
+        randomize(exp);
+      }
+      var tIdx=exp.allocs[b][t];
           var row=[prefixoAno+'-'+(parcIni+pN-1),exp.delin!=='NONE'?b+1:'–','T'+(tIdx+1),exp.tratNames[tIdx]||('T'+(tIdx+1))];
           // Preenche dados coletados no app
           var coletaData = coletaGet(exp.id, b+1, tIdx+1);
@@ -3341,7 +3355,11 @@ function printCroqui(expList){
     for(var b=0;b<nB;b++){
       html += '<tr><td><b>'+(exp.delin!=='NONE'?'B'+(b+1):'–')+'</b></td>';
       for(var t=0;t<nT;t++){
-        var tIdx=exp.allocs[b][t];
+        // Guard: if allocs missing or incomplete, re-randomize
+      if(!exp.allocs || !exp.allocs[b] || exp.allocs[b][t] === undefined){
+        randomize(exp);
+      }
+      var tIdx=exp.allocs[b][t];
         var bg=PAL_T[tIdx%PAL_T.length];
         html += '<td style="background:#'+bg+'44">'
           + '<div style="font-size:8px;color:#555">'+pN2+'</div>'
