@@ -1424,7 +1424,8 @@ var PAL  = ['#3fb950','#64b5f6','#ffb74d','#f06292','#ba68c8',
 // PAL_T: same palette without # for KML and croqui usage
 var PAL_T = ['3FB950','64B5F6','FFB74D','F06292','BA68C8','4DD0E1',
              'E6DB74','FF8A65','A5D6A7','90CAF9','CE93D8','80CBC4',
-             'FFCC02','EF9A9A','B0BEC5','FFE082','81C784','4FC3F7'];
+             'FFCC02','EF9A9A','B0BEC5','FFE082','81C784','4FC3F7',
+             'FFD54F','E57373','9575CD','26C6DA','D4E157','FF7043'];
 var ECOL = ['#e3b341','#f85149','#79c0ff','#56d364','#d2a8ff',
             '#ffa657','#ff7b72','#58a6ff'];
 var TOOLS = {
@@ -2518,10 +2519,7 @@ function exportXLSX(prefixoAno, parcIni){
   toast('Gerando planilha... aguarde','');
   if(!exps.length){toast('Adicione experimentos primeiro','ty');return;}
 
-  var PAL_T=['3FB950','64B5F6','FFB74D','F06292','BA68C8','4DD0E1',
-             'E6DB74','FF8A65','A5D6A7','90CAF9','CE93D8','80CBC4',
-             'FFCC02','EF9A9A','B0BEC5','FFE082','81C784','4FC3F7',
-             'FFD54F','E57373','9575CD','26C6DA','D4E157','FF7043'];
+  
 
   var wb = XLSX.utils.book_new();
 
@@ -3211,10 +3209,7 @@ function printCroqui(expList){
   var eList=expList||exps.filter(function(e){return e.visible&&e._gj&&e._gj.length;});
   if(!eList.length){ toast('Nenhum experimento para imprimir','ty'); return; }
 
-  var PAL_T=['3FB950','64B5F6','FFB74D','F06292','BA68C8','4DD0E1',
-             'E6DB74','FF8A65','A5D6A7','90CAF9','CE93D8','80CBC4',
-             'FFCC02','EF9A9A','B0BEC5','FFE082','81C784','4FC3F7',
-             'FFD54F','E57373','9575CD','26C6DA','D4E157','FF7043'];
+  
 
   var html = '<!DOCTYPE html><html lang="pt-BR"><head>'
     + '<meta charset="UTF-8">'
@@ -3581,42 +3576,12 @@ function loadProjectFromFile(){
    GEOLOCALIZAÇÃO
    ══════════════════════════════════════ */
 function geoLocate(silent){
-  // Diagnóstico detalhado de contexto
-  var proto = location.protocol;
   if(!navigator.geolocation){
     if(!silent) toast('GPS não suportado neste navegador','ty');
     return;
   }
-  // Aviso: file:// e content:// bloqueiam GPS
-  if(proto === 'file:' || proto === 'content:'){
-    if(!silent) {
-      toast('⚠ GPS bloqueado em arquivo local — acesse pelo GitHub Pages','ty');
-      alert('O GPS só funciona quando o app é aberto via HTTPS.\n\n'+
-            'Abra o link: https://rodrigodanielrs-prog.github.io/Agrolyaut-/\n\n'+
-            'Ou instale como PWA (Chrome → Menu → Adicionar à tela inicial).');
-    }
-    setSt('GPS: abra via GitHub Pages',false);
-    return;
-  }
-
   setSt('Obtendo localização…',true);
-
-  // Primeiro: verifica status da permissão (se API disponível)
-  if(navigator.permissions && navigator.permissions.query){
-    navigator.permissions.query({name:'geolocation'}).then(function(result){
-      if(result.state === 'denied'){
-        if(!silent){
-          toast('⚠ Permissão negada — verifique configurações','ty');
-          alert('GPS bloqueado!\n\nChrome Android:\n1. Toque no cadeado/ícone ⓘ ao lado do endereço\n2. "Permissões" → "Local"\n3. Mude para "Permitir"\n4. Recarregue a página');
-        }
-        setSt('GPS: permissão negada',false);
-        return;
-      }
-      _doGeolocate(silent);
-    }).catch(function(){ _doGeolocate(silent); });
-  } else {
-    _doGeolocate(silent);
-  }
+  _doGeolocate(silent);
 }
 
 function _doGeolocate(silent){
