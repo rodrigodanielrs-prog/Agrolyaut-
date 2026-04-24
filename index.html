@@ -4906,10 +4906,21 @@ function aplicarSorteioManual(){
     }
   }
 
+  // Detecta tratamentos ausentes em cada bloco
+  var ausentes = [];
+  for(var b=0; b<nB; b++){
+    var presentes = {};
+    sorteio[b].forEach(function(v){ if(v !== null) presentes[v+1] = true; });
+    for(var t=1; t<=nT; t++){
+      if(!presentes[t]) ausentes.push('T'+t+' ausente no B'+(b+1));
+    }
+  }
+
   var avisos = [];
-  if(vazias) avisos.push(vazias + ' célula(s) vazia(s)');
-  if(foras.length) avisos.push('Valores inválidos: ' + foras.join(', '));
-  if(repetidos.length) avisos.push('Tratamentos repetidos: ' + repetidos.join(', '));
+  if(vazias)          avisos.push(vazias + ' célula(s) vazia(s)');
+  if(foras.length)    avisos.push('Valores inválidos: ' + foras.join(', '));
+  if(repetidos.length)avisos.push('Tratamentos repetidos: ' + repetidos.join(', '));
+  if(ausentes.length) avisos.push('Tratamentos ausentes: ' + ausentes.join(', '));
 
   if(avisos.length){
     var msg = '⚠ Atenção:\n\n' + avisos.join('\n') + '\n\nAplicar mesmo assim?';
