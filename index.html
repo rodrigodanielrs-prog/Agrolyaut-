@@ -1994,7 +1994,7 @@ function addMarker(exp) {
 function drawExp(exp) {
   try {
   exp.layers.forEach(function(l){MAP.removeLayer(l);}); exp.layers=[];
-  if (!exp.visible) return;
+  if (exp.visible === false) return;
   calcPLarg(exp);
   var lat=exp.lat,lng=exp.lng,deg=exp.angle;
   var pw=exp.pLarg,ph=exp.pComp,et=exp.espTrat,eb=exp.espBlocos;
@@ -4994,7 +4994,7 @@ window.addEventListener('load',function(){
     </div>
     <div class="tut-check">
       <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:11px;color:var(--mut)">
-        <input type="checkbox" id="tut-no-show" style="width:15px;height:15px;accent-color:var(--grn);cursor:pointer" onchange="if(this.checked){try{localStorage.setItem('agrolayout-tut-never','1');}catch(e){}}else{try{localStorage.removeItem('agrolayout-tut-never');}catch(e){}}">
+        <input type="checkbox" id="tut-no-show" style="width:15px;height:15px;accent-color:var(--grn);cursor:pointer">
         Não mostrar novamente
       </label>
     </div>
