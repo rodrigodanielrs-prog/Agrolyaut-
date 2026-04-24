@@ -1768,6 +1768,7 @@ function importGJ() {
             exps=[];
             gj.exps.forEach(function(d){
               var exp=newExp(d.lat,d.lng);Object.assign(exp,d);
+              if(exp.visible===false && (!d.version || d.version<4)){exp.visible=true;}
               exps.push(exp);addMarker(exp);drawExp(exp);
             });
             nextExpId=exps.length?Math.max.apply(null,exps.map(function(e){return e.id;}))+1:1;
@@ -1848,6 +1849,11 @@ function loadProjectData(proj){
     exps=[];
     proj.exps.forEach(function(d){
       var exp=newExp(d.lat,d.lng);Object.assign(exp,d);
+      // Migration: projetos antigos podem ter visible:false por bug
+      // Normaliza para true ao carregar (usuário pode ocultar manualmente depois)
+      if(!proj.version || proj.version < 4){
+        exp.visible = true;
+      }
       exps.push(exp);addMarker(exp);drawExp(exp);
     });
     nextExpId=exps.length?Math.max.apply(null,exps.map(function(e){return e.id;}))+1:1;
@@ -3581,6 +3587,7 @@ function loadProjectFromFile(){
           proj.exps.forEach(function(d){
             var exp=newExp(d.lat,d.lng);
             Object.assign(exp,d);
+            if(exp.visible===false && (!d.version || d.version<4)){exp.visible=true;}
             exps.push(exp);addMarker(exp);drawExp(exp);
           });
           nextExpId=exps.length?Math.max.apply(null,exps.map(function(e){return e.id;}))+1:1;
@@ -3713,10 +3720,14 @@ var tutIdx = 0;
 var tutOpen = false;
 
 function tutShow() {
+  // Verifica múltiplas chaves para máxima robustez
   try {
-    if (localStorage.getItem('agrolayout-tut-never') === '1') return;
-    if (localStorage.getItem('agrolayout-tut-done')  === '1') return;
-  } catch(e){}
+    var never = localStorage.getItem('agrolayout-tut-never');
+    var done  = localStorage.getItem('agrolayout-tut-done');
+    // Qualquer string não vazia conta como "dispensado"
+    if (never && never !== 'null' && never !== '') return;
+    if (done  && done  !== 'null' && done  !== '') return;
+  } catch(e){ console.warn('Tutorial check failed:', e); }
   tutOpen = true;
   tutIdx  = 0;
   var overlay = document.getElementById('tut-overlay');
@@ -4803,6 +4814,7 @@ window.addEventListener('load',function(){
         exps=[];
         proj.exps.forEach(function(d){
           var exp=newExp(d.lat,d.lng); Object.assign(exp,d);
+          if(exp.visible===false && (!d.version || d.version<4)){exp.visible=true;}
           exps.push(exp); addMarker(exp); drawExp(exp);
         });
         nextExpId=exps.length?Math.max.apply(null,exps.map(function(e){return e.id;}))+1:1;
@@ -4994,7 +5006,7 @@ window.addEventListener('load',function(){
     </div>
     <div class="tut-check">
       <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:11px;color:var(--mut)">
-        <input type="checkbox" id="tut-no-show" style="width:15px;height:15px;accent-color:var(--grn);cursor:pointer">
+        <input type="checkbox" id="tut-no-show" style="width:15px;height:15px;accent-color:var(--grn);cursor:pointer" onclick="try{if(this.checked)localStorage.setItem('agrolayout-tut-never','1');else localStorage.removeItem('agrolayout-tut-never');}catch(e){}">
         Não mostrar novamente
       </label>
     </div>
@@ -5010,7 +5022,7 @@ window.addEventListener('load',function(){
 
 <script>
 if('serviceWorker' in navigator && location.protocol !== 'file:'){
-  var swCode = `const CACHE = 'agrolayout-v1';
+  var swCode = `const CACHE = 'agrolayout-v2';
 const TILES = 'agrolayout-tiles-v1';
 
 self.addEventListener('install', e => {
