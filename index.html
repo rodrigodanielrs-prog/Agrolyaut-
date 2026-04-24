@@ -1532,7 +1532,11 @@ function initMap() {
     document.getElementById('s-coord').textContent =
       e.latlng.lat.toFixed(5)+', '+e.latlng.lng.toFixed(5);
   });
-  MAP.on('zoomend', syncZoom);
+  MAP.on('zoomend', function(){
+    syncZoom();
+    // Redesenha labels quando zoom muda (labels são zoom-dependentes)
+    exps.forEach(function(e){ if(e.visible !== false) drawExp(e); });
+  });
   MAP.on('draw:created', onDrawCreated);
   MAP.on('draw:drawvertex', onDrawVertex);
 }
@@ -2071,10 +2075,53 @@ function drawExp(exp) {
       }
       exp.layers.push(poly);
       var ctr=offsetM(lat,lng,x0+pw/2,y0+ph/2,deg);
-      exp.layers.push(L.marker(ctr,{icon:L.divIcon({
-        html:'<div style="background:rgba(0,0,0,.75);color:#fff;font-family:monospace;font-size:8px;padding:1px 3px;border-radius:2px;white-space:nowrap;max-width:52px;overflow:hidden;text-overflow:ellipsis">'+nm+'</div>',
-        iconSize:[0,0],iconAnchor:[0,0],className:''
-      })}).addTo(MAP));
+      // Label proporcional — só aparece a partir do zoom 20
+      (function(_nm, _pw, _ph, _deg){
+        // Calcula tamanho da fonte proporcional à parcela
+        // pw = largura da parcela em metros, ph = comprimento
+        // Em zoom 20: ~1m ≈ 26px; zoom 21: ~1m ≈ 52px
+        var z   = MAP.getZoom();
+        if(z < 20) return;  // não exibe abaixo de zoom 20
+
+        var mPx   = Math.pow(2, z) * 256 / 40075016.7 * Math.cos(ctr.lat * Math.PI/180);
+        var wPx   = Math.round(_pw * mPx);   // largura da parcela em px
+        var hPx   = Math.round(_ph * mPx);   // comprimento em px
+
+        // Fonte proporcional: 60% da largura da parcela, máx 14px, mín 7px
+        var fSize = Math.min(14, Math.max(7, Math.floor(wPx * 0.45)));
+
+        // Trunca nome para caber na largura
+        var label = _nm;
+        var maxChars = Math.max(3, Math.floor(wPx / (fSize * 0.55)));
+        if(label.length > maxChars) label = label.slice(0, maxChars-1) + '…';
+
+        var html = '<div style="'+
+          'width:'+wPx+'px;'+
+          'height:'+hPx+'px;'+
+          'display:flex;align-items:center;justify-content:center;'+
+          'font-size:'+fSize+'px;'+
+          'font-family:Inter,Arial,sans-serif;'+
+          'font-weight:600;'+
+          'color:#fff;'+
+          'text-shadow:0 1px 3px rgba(0,0,0,.9),0 0 6px rgba(0,0,0,.7);'+
+          'text-align:center;'+
+          'line-height:1.1;'+
+          'pointer-events:none;'+
+          'transform:rotate('+_deg+'deg);'+
+          'transform-origin:center center;'+
+          'overflow:hidden;'+
+          'padding:2px;'+
+          'box-sizing:border-box;'+
+          'word-break:break-word'+
+          '">'+label+'</div>';
+
+        exp.layers.push(L.marker(ctr,{icon:L.divIcon({
+          html: html,
+          iconSize: [wPx, hPx],
+          iconAnchor: [wPx/2, hPx/2],
+          className: ''
+        }), interactive:false, zIndexOffset:-100}).addTo(MAP));
+      })(nm, pw, ph, deg);
       gj.push({type:'Feature',
         properties:{exp:exp.id,exp_nome:exp.name,bloco:b+1,trat_idx:tIdx+1,trat_nome:nm},
         geometry:{type:'Polygon',coordinates:[cc.map(function(p){return[p.lng,p.lat];}).concat([[cc[0].lng,cc[0].lat]])]}
@@ -3565,10 +3612,11 @@ function autoSaveProject(){
 }
 
 function saveProject(){
-  var proj={version:3,date:new Date().toISOString(),
+  var proj={version:4,date:new Date().toISOString(),
     e1:areaFeats.map(function(f){return{type:f.type,name:f.name,info:f.info,gj:f.gj};}),
     exps:exps.map(function(exp){return{id:exp.id,name:exp.name,color:exp.color,lat:exp.lat,lng:exp.lng,angle:exp.angle,delin:exp.delin,nTrat:exp.nTrat,nBlocos:exp.nBlocos,nLinhas:exp.nLinhas,espLinhas:exp.espLinhas,pLarg:exp.pLarg,pComp:exp.pComp,espTrat:exp.espTrat,espBlocos:exp.espBlocos,bloco1Fixed:exp.bloco1Fixed,visible:exp.visible,tratNames:exp.tratNames,allocs:exp.allocs,dataSemeadura:exp.dataSemeadura,cultura:exp.cultura,sorteioManual:exp.sorteioManual};}),
-    vars:vars};
+    vars:vars,
+    coleta:(typeof coletaLoad==='function'?coletaLoad():{})};
   var fileName='agrolayout_'+new Date().toISOString().slice(0,10)+'.json';
   // Salva arquivo JSON
   dl(fileName,JSON.stringify(proj,null,2),'application/json');
