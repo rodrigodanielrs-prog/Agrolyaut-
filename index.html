@@ -2075,50 +2075,52 @@ function drawExp(exp) {
       }
       exp.layers.push(poly);
       var ctr=offsetM(lat,lng,x0+pw/2,y0+ph/2,deg);
-      // Label proporcional — só aparece a partir do zoom 20
+      // Label proporcional — sempre paralelo ao COMPRIMENTO da parcela
       (function(_nm, _pw, _ph, _deg){
-        // Calcula tamanho da fonte proporcional à parcela
-        // pw = largura da parcela em metros, ph = comprimento
-        // Em zoom 20: ~1m ≈ 26px; zoom 21: ~1m ≈ 52px
-        var z   = MAP.getZoom();
+        var z = MAP.getZoom();
         if(z < 20) return;  // não exibe abaixo de zoom 20
 
-        var mPx   = Math.pow(2, z) * 256 / 40075016.7 * Math.cos(ctr.lat * Math.PI/180);
-        var wPx   = Math.round(_pw * mPx);   // largura da parcela em px
-        var hPx   = Math.round(_ph * mPx);   // comprimento em px
+        var mPx = Math.pow(2, z) * 256 / 40075016.7 * Math.cos(ctr.lat * Math.PI/180);
+        var wPx = Math.round(_pw * mPx);  // largura da parcela em px (eixo curto)
+        var hPx = Math.round(_ph * mPx);  // comprimento da parcela em px (eixo longo)
 
-        // Fonte proporcional: 60% da largura da parcela, máx 14px, mín 7px
-        var fSize = Math.min(14, Math.max(7, Math.floor(wPx * 0.45)));
+        // Fonte proporcional à LARGURA (eixo curto) — para o texto caber entre as bordas
+        // mas o texto se estende ao longo do COMPRIMENTO
+        var fSize = Math.min(18, Math.max(7, Math.floor(wPx * 0.55)));
 
-        // Trunca nome para caber na largura
+        // Trunca baseado no COMPRIMENTO da parcela
         var label = _nm;
-        var maxChars = Math.max(3, Math.floor(wPx / (fSize * 0.55)));
+        var maxChars = Math.max(3, Math.floor(hPx / (fSize * 0.55)));
         if(label.length > maxChars) label = label.slice(0, maxChars-1) + '…';
 
+        // O HTML interno tem dimensões hPx × wPx (comprimento × largura)
+        // antes da rotação. Depois é rotacionado pelo ângulo da parcela.
         var html = '<div style="'+
-          'width:'+wPx+'px;'+
-          'height:'+hPx+'px;'+
+          'width:'+hPx+'px;'+
+          'height:'+wPx+'px;'+
           'display:flex;align-items:center;justify-content:center;'+
           'font-size:'+fSize+'px;'+
           'font-family:Inter,Arial,sans-serif;'+
-          'font-weight:600;'+
+          'font-weight:700;'+
           'color:#fff;'+
-          'text-shadow:0 1px 3px rgba(0,0,0,.9),0 0 6px rgba(0,0,0,.7);'+
+          'text-shadow:0 1px 3px rgba(0,0,0,.95),0 0 5px rgba(0,0,0,.8);'+
           'text-align:center;'+
-          'line-height:1.1;'+
+          'line-height:1;'+
           'pointer-events:none;'+
+          'white-space:nowrap;'+
+          'overflow:hidden;'+
           'transform:rotate('+_deg+'deg);'+
           'transform-origin:center center;'+
-          'overflow:hidden;'+
-          'padding:2px;'+
-          'box-sizing:border-box;'+
-          'word-break:break-word'+
           '">'+label+'</div>';
 
+        // O icon precisa ter dimensão suficiente para acomodar o div rotacionado
+        // Usamos hPx×hPx como caixa quadrada para qualquer ângulo caber
+        var box = Math.max(hPx, wPx) + 4;
+
         exp.layers.push(L.marker(ctr,{icon:L.divIcon({
-          html: html,
-          iconSize: [wPx, hPx],
-          iconAnchor: [wPx/2, hPx/2],
+          html: '<div style="width:'+box+'px;height:'+box+'px;display:flex;align-items:center;justify-content:center">'+html+'</div>',
+          iconSize: [box, box],
+          iconAnchor: [box/2, box/2],
           className: ''
         }), interactive:false, zIndexOffset:-100}).addTo(MAP));
       })(nm, pw, ph, deg);
