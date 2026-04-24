@@ -2302,7 +2302,8 @@ function renderExpPanel() {
         '<label>🌾 Cultura</label>'+
         '<input type="text" class="ep-inp" value="'+xe(exp.cultura||'')+'" '+
           'placeholder="Ex: Trigo, Aveia, Canola..." '+
-          'onchange="onField(this,\'cultura\','+exp.id+')">'+
+          'onblur="onField(this,\'cultura\','+exp.id+')" '+
+          'style="font-size:13px;padding:7px 10px;min-height:32px">'+
       '</div>'+
       '<div class="ep-field">'+
         '<label>Delineamento</label>'+
@@ -2369,7 +2370,19 @@ function renderExpPanel() {
 // Input handlers
 function onExpName(el,id){var exp=getExp(id);if(!exp)return;exp.name=el.value||('Exp '+id);drawExp(exp);renderExpList();}
 function onTratName(el){var exp=getExp(parseInt(el.dataset.ei));if(!exp)return;exp.tratNames[parseInt(el.dataset.ti)]=el.value;drawExp(exp);}
-function onField(el,key,id){var exp=getExp(id);if(!exp)return;exp[key]=el.value;randomize(exp);drawExp(exp);renderExpPanel();renderExpList();}
+function onField(el,key,id){
+  var exp=getExp(id);if(!exp)return;
+  exp[key]=el.value;
+  // Campos que NÃO afetam geometria — não precisam re-randomize nem redraw
+  var soMetadata = (key==='dataSemeadura' || key==='cultura' || key==='name');
+  if(!soMetadata){
+    randomize(exp);
+    drawExp(exp);
+    renderExpPanel();
+  }
+  renderExpList();
+  autoSaveLastProject();
+}
 function onFieldN(el,key,id){var exp=getExp(id);if(!exp)return;exp[key]=parseInt(el.value)||1;randomize(exp);drawExp(exp);renderExpPanel();renderExpList();}
 function onFieldF(el,key,id){var exp=getExp(id);if(!exp)return;exp[key]=parseFloat(el.value)||0;drawExp(exp);renderExpPanel();renderExpList();}
 function onAngle(el,id){
