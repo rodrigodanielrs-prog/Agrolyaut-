@@ -4801,6 +4801,145 @@ function updateSaveIndicator(){
   }
 }
 
+
+/* ══════════════════════════════════════════════════════════════
+   SORTEIO MANUAL — Define ordem de tratamentos por bloco
+   ══════════════════════════════════════════════════════════════ */
+
+var _sorteioExpId = null;
+
+function abrirSorteioModal(expId){
+  var exp = getExp(expId);
+  if(!exp) return;
+  if(exp.delin === 'NONE'){
+    toast('Sorteio manual disponível apenas para DBC/DIC','ty');
+    return;
+  }
+  _sorteioExpId = expId;
+  renderSorteioTabela();
+  document.getElementById('sorteio-sub').textContent =
+    exp.name + ' — ' + exp.nTrat + ' tratamentos × ' +
+    (exp.delin==='NONE'?1:exp.nBlocos) + ' blocos';
+  document.getElementById('sorteio-modal').style.display = 'flex';
+}
+
+function fecharSorteioModal(){
+  document.getElementById('sorteio-modal').style.display = 'none';
+  _sorteioExpId = null;
+}
+
+function renderSorteioTabela(){
+  var exp = getExp(_sorteioExpId);
+  if(!exp) return;
+  var nB = exp.delin==='NONE' ? 1 : exp.nBlocos;
+  var nT = exp.nTrat;
+  var sort = exp.sorteioManual || exp.allocs || [];
+
+  var html = '<table style="width:100%;border-collapse:collapse;font-size:12px">';
+  html += '<thead><tr><th style="background:var(--card);padding:6px;border:1px solid var(--bord);width:50px">Bloco</th>';
+  for(var p=0; p<nT; p++){
+    html += '<th style="background:var(--card);padding:6px;border:1px solid var(--bord);min-width:50px">P'+(p+1)+'</th>';
+  }
+  html += '</tr></thead><tbody>';
+
+  for(var b=0; b<nB; b++){
+    html += '<tr><td style="background:var(--card);padding:6px;border:1px solid var(--bord);text-align:center;font-weight:700">B'+(b+1)+'</td>';
+    for(var p=0; p<nT; p++){
+      var val = '';
+      if(sort[b] && sort[b][p] !== undefined && sort[b][p] !== null){
+        val = (sort[b][p] + 1);
+      }
+      html += '<td style="padding:2px;border:1px solid var(--bord)">' +
+        '<input type="number" min="1" max="'+nT+'" value="'+val+'" ' +
+        'data-bloco="'+b+'" data-pos="'+p+'" ' +
+        'style="width:100%;background:var(--card);border:none;color:var(--txt);' +
+        'padding:8px 4px;text-align:center;font-size:13px;outline:none;border-radius:3px" ' +
+        'onfocus="this.select()">' +
+        '</td>';
+    }
+    html += '</tr>';
+  }
+  html += '</tbody></table>';
+  document.getElementById('sorteio-tabela').innerHTML = html;
+}
+
+function sorteioPreencherSequencial(){
+  var exp = getExp(_sorteioExpId);
+  if(!exp) return;
+  var inputs = document.querySelectorAll('#sorteio-tabela input[type="number"]');
+  inputs.forEach(function(inp){
+    var p = parseInt(inp.getAttribute('data-pos'));
+    inp.value = p + 1;
+  });
+  toast('Preenchido 1, 2, 3... em todos os blocos');
+}
+
+function aplicarSorteioManual(){
+  var exp = getExp(_sorteioExpId);
+  if(!exp) return;
+  var nB = exp.delin==='NONE' ? 1 : exp.nBlocos;
+  var nT = exp.nTrat;
+
+  var sorteio = [];
+  var vazias = 0;
+  var foras = [];
+  var repetidos = [];
+
+  for(var b=0; b<nB; b++){
+    sorteio[b] = [];
+    var vistosBloco = {};
+    for(var p=0; p<nT; p++){
+      var inp = document.querySelector(
+        '#sorteio-tabela input[data-bloco="'+b+'"][data-pos="'+p+'"]'
+      );
+      var v = inp ? inp.value.trim() : '';
+      if(v === ''){ vazias++; sorteio[b][p] = null; continue; }
+      var n = parseInt(v);
+      if(isNaN(n) || n < 1 || n > nT){
+        foras.push('B'+(b+1)+'-P'+(p+1)+': '+v);
+        sorteio[b][p] = null;
+        continue;
+      }
+      if(vistosBloco[n]){ repetidos.push('T'+n+' no B'+(b+1)); }
+      else { vistosBloco[n] = true; }
+      sorteio[b][p] = n - 1;
+    }
+  }
+
+  var avisos = [];
+  if(vazias) avisos.push(vazias + ' célula(s) vazia(s)');
+  if(foras.length) avisos.push('Valores inválidos: ' + foras.join(', '));
+  if(repetidos.length) avisos.push('Tratamentos repetidos: ' + repetidos.join(', '));
+
+  if(avisos.length){
+    var msg = '⚠ Atenção:\n\n' + avisos.join('\n') + '\n\nAplicar mesmo assim?';
+    if(!confirm(msg)) return;
+  }
+
+  exp.sorteioManual = sorteio;
+  exp.allocs = sorteio.map(function(b){ return b.slice(); });
+  drawExp(exp);
+  renderExpPanel();
+  renderExpList();
+  autoSaveLastProject();
+  fecharSorteioModal();
+  toast('✓ Sorteio manual aplicado em ' + exp.name);
+  setSt('Sorteio manual ativo — não será mais randomizado', true);
+}
+
+function limparSorteioManual(expId){
+  var exp = getExp(expId);
+  if(!exp) return;
+  if(!confirm('Remover sorteio manual e voltar ao sorteio aleatório?')) return;
+  delete exp.sorteioManual;
+  randomize(exp);
+  drawExp(exp);
+  renderExpPanel();
+  renderExpList();
+  autoSaveLastProject();
+  toast('↻ Sorteio aleatório restaurado');
+}
+
 // Aviso ao fechar/recarregar com alterações não salvas
 window.addEventListener('beforeunload', function(e){
   if(_dirtyFlag){
