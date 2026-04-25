@@ -1903,6 +1903,7 @@ function newExp(lat,lng) {
     id:id, name:'Experimento '+id, color:color,
     lat:lat, lng:lng, angle:window._autoAngle||0,
     delin:'DBC', nTrat:2, nBlocos:2,
+    nFatA:2, nFatB:2, fatANames:[], fatBNames:[],
     dataSemeadura:'', cultura:'',
     nLinhas:1, espLinhas:0.17,
     pLarg:0.17, pComp:5.0,
@@ -1919,26 +1920,72 @@ function calcPLarg(exp) {
 }
 
 function randomize(exp) {
-  // Se tem sorteio manual, respeita — não randomiza
+  // Sorteio manual sempre prevalece
   if(exp.sorteioManual && exp.sorteioManual.length){
-    // Copia sorteio manual para allocs
     exp.allocs = exp.sorteioManual.map(function(b){
-      return b.map(function(v){
-        // Se valor é null/undefined, preenche com sequencial como fallback
-        return (v === null || v === undefined) ? 0 : v;
-      });
+      return b.map(function(v){ return (v===null||v===undefined)?0:v; });
     });
     return;
   }
-  // Sorteio aleatório padrão
   exp.allocs = [];
+
+  if(exp.delin === 'FAT'){
+    var nA=exp.nFatA||2, nBf=exp.nFatB||2, nTrat=nA*nBf;
+    exp.nTrat = nTrat;
+    for(var b=0;b<exp.nBlocos;b++)
+      exp.allocs.push(shuffle(Array.from({length:nTrat},function(_,i){return i;})));
+    fatGerarNomes(exp); return;
+  }
+
+  if(exp.delin === 'PS'){
+    var nA=exp.nFatA||2, nBf=exp.nFatB||2;
+    exp.nTrat = nA*nBf;
+    for(var b=0;b<exp.nBlocos;b++){
+      var bAlloc=[], aOrd=shuffle(Array.from({length:nA},function(_,i){return i;}));
+      for(var ai=0;ai<nA;ai++){
+        var a=aOrd[ai];
+        var bOrd=shuffle(Array.from({length:nBf},function(_,i){return i;}));
+        for(var bi=0;bi<nBf;bi++) bAlloc.push(a*nBf+bOrd[bi]);
+      }
+      exp.allocs.push(bAlloc);
+    }
+    fatGerarNomes(exp); return;
+  }
+
+  if(exp.delin === 'FAIXAS'){
+    var nA=exp.nFatA||2, nBf=exp.nFatB||2;
+    exp.nTrat = nA*nBf;
+    for(var b=0;b<exp.nBlocos;b++){
+      var bAlloc=[], aOrd=shuffle(Array.from({length:nA},function(_,i){return i;}));
+      for(var ai=0;ai<nA;ai++){
+        var a=aOrd[ai];
+        for(var col=0;col<nBf;col++) bAlloc.push(a*nBf+col);
+      }
+      exp.allocs.push(bAlloc);
+    }
+    fatGerarNomes(exp); return;
+  }
+
+  // DBC / DIC / NONE padrão
   var nB = exp.delin==='NONE'?1:exp.nBlocos;
-  for (var b=0; b<nB; b++) {
-    if (b===0 && exp.bloco1Fixed)
+  for(var b=0;b<nB;b++){
+    if(b===0 && exp.bloco1Fixed)
       exp.allocs.push(Array.from({length:exp.nTrat},function(_,i){return i;}));
     else
       exp.allocs.push(shuffle(Array.from({length:exp.nTrat},function(_,i){return i;})));
   }
+}
+
+function fatGerarNomes(exp){
+  var nA=exp.nFatA||2, nBf=exp.nFatB||2;
+  var aN=exp.fatANames||[], bN=exp.fatBNames||[];
+  var names=[];
+  for(var a=0;a<nA;a++){
+    for(var b=0;b<nBf;b++){
+      names.push((aN[a]||('A'+(a+1)))+(bN[b]||('B'+(b+1))));
+    }
+  }
+  exp.tratNames=names; exp.nTrat=names.length;
 }
 
 function getAreaCenter() {
@@ -2163,6 +2210,29 @@ function drawExp(exp) {
       });
     }
   }
+  // Para Parcelas Subdivididas: desenha bordas das Parcelas Principais
+  if(exp.delin === 'PS'){
+    var nA = exp.nFatA||2, nBf = exp.nFatB||2;
+    var nB = exp.nBlocos;
+    for(var b=0; b<nB; b++){
+      var y0b = b*(nA*nBf*pw + (nA*nBf-1)*et + eb) - (b>0?0:0);
+      // Cada PP ocupa nBf subparcelas lado a lado
+      for(var ai=0; ai<nA; ai++){
+        // Posição x da PP: ai * nBf * (pw+et)
+        var x0pp = ai * nBf * (pw+et);
+        var y0pp = b  * (ph + eb);
+        var ppW  = nBf*pw + (nBf-1)*et;
+        var ppH  = ph;
+        var ppCc = corners(lat,lng,x0pp,y0pp,ppW,ppH,deg);
+        var ppPoly = L.polygon(ppCc,{
+          color:'#ffffff',weight:2.5,fill:false,
+          dashArray:'6,4',interactive:false,zIndexOffset:-50
+        }).addTo(MAP);
+        exp.layers.push(ppPoly);
+      }
+    }
+  }
+
   exp._gj = gj;
   autoSaveLastProject();
   } catch(e){ console.warn('drawExp error (exp '+exp.id+'):', e.message); }
@@ -2404,6 +2474,9 @@ function renderExpPanel() {
         '<select onchange="onField(this,\'delin\','+exp.id+')">'+
           '<option value="DBC"'+(exp.delin==='DBC'?' selected':'')+'>DBC – Blocos Casualizados</option>'+
           '<option value="DIC"'+(exp.delin==='DIC'?' selected':'')+'>DIC – Inteiramente Casualizado</option>'+
+          '<option value="FAT"'+(exp.delin==='FAT'?' selected':'')+'>Fatorial em DBC</option>'+
+          '<option value="PS"'+(exp.delin==='PS'?' selected':'')+'>Parcelas Subdivididas em DBC</option>'+
+          '<option value="FAIXAS"'+(exp.delin==='FAIXAS'?' selected':'')+'>Experimento em Faixas</option>'+
           '<option value="NONE"'+(exp.delin==='NONE'?' selected':'')+'>Sem delineamento</option>'+
         '</select>'+
       '</div>'+
@@ -2432,10 +2505,39 @@ function renderExpPanel() {
             'padding:3px;cursor:pointer;margin-top:2px">'+
             '↻ Voltar ao sorteio aleatório</button>':'')+
         '</div>':'')+
-      '<div class="ep-grid2">'+
+      // Painel dinâmico por delineamento
+      (exp.delin==='FAT'||exp.delin==='PS'||exp.delin==='FAIXAS' ?
+        '<div class="ep-field">'+
+          '<label>'+(exp.delin==='PS'?'Fator A — Parcela Principal':exp.delin==='FAIXAS'?'Fator A — Linhas (sorteado por bloco)':'Fator A')+'</label>'+
+          '<div style="display:flex;gap:4px">'+
+            '<input type="number" class="ep-inp" value="'+(exp.nFatA||2)+'" min="2" max="20" style="width:60px" onchange="onFatA(this,'+exp.id+')">'+
+            '<button onclick="abrirFatNomes('+exp.id+',\'A\')" style="flex:1;background:var(--card);border:1px solid var(--bord);color:var(--txt);font-size:10px;padding:4px;border-radius:4px;cursor:pointer">✏️ Nomes A</button>'+
+          '</div>'+
+        '</div>'+
+        '<div class="ep-field">'+
+          '<label>'+(exp.delin==='PS'?'Fator B — Subparcela':exp.delin==='FAIXAS'?'Fator B — Colunas (fixas em todos os blocos)':'Fator B')+'</label>'+
+          '<div style="display:flex;gap:4px">'+
+            '<input type="number" class="ep-inp" value="'+(exp.nFatB||2)+'" min="2" max="20" style="width:60px" onchange="onFatB(this,'+exp.id+')">'+
+            '<button onclick="abrirFatNomes('+exp.id+',\'B\')" style="flex:1;background:var(--card);border:1px solid var(--bord);color:var(--txt);font-size:10px;padding:4px;border-radius:4px;cursor:pointer">✏️ Nomes B</button>'+
+          '</div>'+
+        '</div>'+
+        '<div class="ep-field"><label>Blocos (repetições)</label>'+
+          '<input type="number" class="ep-inp" value="'+exp.nBlocos+'" min="2" max="10" onchange="onFieldN(this,\'nBlocos\','+exp.id+')">'+
+        '</div>'+
+        '<div style="font-size:10px;color:var(--mut);background:var(--card);padding:6px 8px;border-radius:4px;margin-bottom:6px;line-height:1.6">'+
+          (exp.delin==='FAT'?
+            'Tratamentos: <b>'+((exp.nFatA||2)*(exp.nFatB||2))+'</b> combinações · Total parcelas: <b>'+((exp.nFatA||2)*(exp.nFatB||2)*exp.nBlocos)+'</b>':
+           exp.delin==='PS'?
+            'PP: <b>'+(exp.nFatA||2)+'</b> · Subparcelas/PP: <b>'+(exp.nFatB||2)+'</b> · Total: <b>'+((exp.nFatA||2)*(exp.nFatB||2)*exp.nBlocos)+'</b>':
+            'Faixas A: <b>'+(exp.nFatA||2)+'</b> × Faixas B: <b>'+(exp.nFatB||2)+'</b> · Total: <b>'+((exp.nFatA||2)*(exp.nFatB||2)*exp.nBlocos)+'</b>'
+          )+
+        '</div>'
+      :
+        '<div class="ep-grid2">'+
         '<div class="ep-field"><label>Tratamentos</label><input type="number" class="ep-inp" value="'+exp.nTrat+'" min="1" max="30" onchange="onFieldN(this,\'nTrat\','+exp.id+')"></div>'+
         '<div class="ep-field"><label>Blocos</label><input type="number" class="ep-inp" value="'+exp.nBlocos+'" min="1" max="12" '+(exp.delin==='NONE'?'disabled':'')+' onchange="onFieldN(this,\'nBlocos\','+exp.id+')"></div>'+
-      '</div>'+
+        '</div>'
+      )+
       '<div class="ep-grid2">'+
         '<div class="ep-field"><label>Linhas/parc.</label><input type="number" class="ep-inp" value="'+exp.nLinhas+'" min="1" max="20" step="1" onchange="onFieldN(this,\'nLinhas\','+exp.id+')"></div>'+
         '<div class="ep-field"><label>Esp. linhas (m)</label><input type="number" class="ep-inp" value="'+exp.espLinhas+'" min="0.1" step="0.01" onchange="onFieldF(this,\'espLinhas\','+exp.id+')"></div>'+
@@ -3620,7 +3722,9 @@ function autoSaveLastProject(){
         bloco1Fixed:exp.bloco1Fixed,visible:exp.visible,
         tratNames:exp.tratNames,allocs:exp.allocs,
         dataSemeadura:exp.dataSemeadura,cultura:exp.cultura,
-        sorteioManual:exp.sorteioManual
+        sorteioManual:exp.sorteioManual,
+        nFatA:exp.nFatA,nFatB:exp.nFatB,
+        fatANames:exp.fatANames,fatBNames:exp.fatBNames
       };}),
       vars: vars,
       coleta: (typeof coletaLoad === 'function' ? coletaLoad() : {})
@@ -3649,7 +3753,7 @@ function autoSaveProject(){
 function saveProject(){
   var proj={version:4,date:new Date().toISOString(),
     e1:areaFeats.map(function(f){return{type:f.type,name:f.name,info:f.info,gj:f.gj};}),
-    exps:exps.map(function(exp){return{id:exp.id,name:exp.name,color:exp.color,lat:exp.lat,lng:exp.lng,angle:exp.angle,delin:exp.delin,nTrat:exp.nTrat,nBlocos:exp.nBlocos,nLinhas:exp.nLinhas,espLinhas:exp.espLinhas,pLarg:exp.pLarg,pComp:exp.pComp,espTrat:exp.espTrat,espBlocos:exp.espBlocos,bloco1Fixed:exp.bloco1Fixed,visible:exp.visible,tratNames:exp.tratNames,allocs:exp.allocs,dataSemeadura:exp.dataSemeadura,cultura:exp.cultura,sorteioManual:exp.sorteioManual};}),
+    exps:exps.map(function(exp){return{id:exp.id,name:exp.name,color:exp.color,lat:exp.lat,lng:exp.lng,angle:exp.angle,delin:exp.delin,nTrat:exp.nTrat,nBlocos:exp.nBlocos,nLinhas:exp.nLinhas,espLinhas:exp.espLinhas,pLarg:exp.pLarg,pComp:exp.pComp,espTrat:exp.espTrat,espBlocos:exp.espBlocos,bloco1Fixed:exp.bloco1Fixed,visible:exp.visible,tratNames:exp.tratNames,allocs:exp.allocs,dataSemeadura:exp.dataSemeadura,cultura:exp.cultura,sorteioManual:exp.sorteioManual,nFatA:exp.nFatA,nFatB:exp.nFatB,fatANames:exp.fatANames,fatBNames:exp.fatBNames};}),
     vars:vars,
     coleta:(typeof coletaLoad==='function'?coletaLoad():{})};
   var fileName='agrolayout_'+new Date().toISOString().slice(0,10)+'.json';
@@ -5034,6 +5138,115 @@ function limparSorteioManual(expId){
   toast('↻ Sorteio aleatório restaurado');
 }
 
+
+/* ══════════════════════════════════════════════════════════════
+   FATORIAL E PARCELAS SUBDIVIDIDAS — funções de configuração
+   ══════════════════════════════════════════════════════════════ */
+
+function onFatA(el, id){
+  var exp = getExp(id); if(!exp) return;
+  exp.nFatA = Math.max(2, parseInt(el.value)||2);
+  exp.nTrat = (exp.nFatA||2) * (exp.nFatB||2);
+  fatGerarNomes(exp);
+  randomize(exp); drawExp(exp);
+  renderExpPanel(); renderExpList();
+  autoSaveLastProject();
+}
+
+function onFatB(el, id){
+  var exp = getExp(id); if(!exp) return;
+  exp.nFatB = Math.max(2, parseInt(el.value)||2);
+  exp.nTrat = (exp.nFatA||2) * (exp.nFatB||2);
+  fatGerarNomes(exp);
+  randomize(exp); drawExp(exp);
+  renderExpPanel(); renderExpList();
+  autoSaveLastProject();
+}
+
+function abrirFatNomes(id, fator){
+  var exp = getExp(id); if(!exp) return;
+  var n   = fator==='A' ? (exp.nFatA||2) : (exp.nFatB||2);
+  var arr = fator==='A' ? (exp.fatANames||[]) : (exp.fatBNames||[]);
+  var lbl = fator==='A'
+    ? (exp.delin==='PS' ? 'Fator A — Parcela Principal' : 'Fator A')
+    : (exp.delin==='PS' ? 'Fator B — Subparcela' : 'Fator B');
+
+  var html = '<div style="padding:18px;max-width:400px">' +
+    '<div style="font-family:var(--fh);font-weight:800;color:var(--grn);margin-bottom:12px">'+
+    '✏️ Nomes do '+lbl+'</div>'+
+    '<div style="font-size:11px;color:var(--mut);margin-bottom:10px">'+
+    'Deixe em branco para usar A1, A2... automaticamente.<br>'+
+    'Se preencher nomes, as combinações ficam: <b>NomeA × NomeB</b></div>';
+
+  for(var i=0; i<n; i++){
+    var v = arr[i] || '';
+    var placeholder = fator==='A' ? 'A'+(i+1) : 'B'+(i+1);
+    html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">'+
+      '<div style="width:28px;font-size:11px;color:var(--mut);text-align:right">'+placeholder+':</div>'+
+      '<input type="text" id="fatnome-'+fator+'-'+i+'" value="'+xe(v)+'" '+
+      'placeholder="'+placeholder+'" '+
+      'style="flex:1;background:var(--card);border:1px solid var(--bord);color:var(--txt);'+
+      'font-size:12px;padding:6px 9px;border-radius:4px;outline:none">'+
+      '</div>';
+  }
+
+  html += '<div style="display:flex;gap:8px;margin-top:14px">'+
+    '<button onclick="fecharFatNomesModal()" '+
+    'style="flex:1;background:var(--card);border:1px solid var(--bord);color:var(--txt);'+
+    'font-size:12px;padding:9px;border-radius:5px;cursor:pointer">Cancelar</button>'+
+    '<button onclick="aplicarFatNomes('+id+',\''+fator+'\')" '+
+    'style="flex:2;background:var(--grn);border:none;color:#07090a;'+
+    'font-family:var(--fh);font-weight:800;font-size:12px;padding:9px;border-radius:5px;cursor:pointer">'+
+    '✓ Aplicar</button>'+
+    '</div></div>';
+
+  document.getElementById('fat-nomes-body').innerHTML = html;
+  document.getElementById('fat-nomes-modal').style.display = 'flex';
+}
+
+function fecharFatNomesModal(){
+  document.getElementById('fat-nomes-modal').style.display = 'none';
+}
+
+function aplicarFatNomes(id, fator){
+  var exp = getExp(id); if(!exp) return;
+  var n   = fator==='A' ? (exp.nFatA||2) : (exp.nFatB||2);
+  var arr = [];
+  for(var i=0; i<n; i++){
+    var el = document.getElementById('fatnome-'+fator+'-'+i);
+    arr.push(el ? el.value.trim() : '');
+  }
+
+  if(fator==='A') exp.fatANames = arr;
+  else            exp.fatBNames = arr;
+
+  // Se nenhum nome digitado, usa automático
+  var anyName = arr.some(function(v){ return v !== ''; });
+
+  // Recalcula nomes das combinações
+  var nA = exp.nFatA||2, nBf = exp.nFatB||2;
+  var aN = exp.fatANames||[], bN = exp.fatBNames||[];
+  var names = [];
+  for(var a=0; a<nA; a++){
+    for(var b=0; b<nBf; b++){
+      var na = aN[a]||('A'+(a+1));
+      var nb = bN[b]||('B'+(b+1));
+      // Se ambos têm nome real, usa × como separador; senão usa concatenação
+      var hasNameA = aN[a] && aN[a].trim();
+      var hasNameB = bN[b] && bN[b].trim();
+      if(hasNameA && hasNameB) names.push(na+' × '+nb);
+      else names.push(na+nb);
+    }
+  }
+  exp.tratNames = names;
+  exp.nTrat     = names.length;
+
+  fecharFatNomesModal();
+  drawExp(exp); renderExpPanel(); renderExpList();
+  autoSaveLastProject();
+  toast('✓ Nomes do Fator '+fator+' aplicados');
+}
+
 // Aviso ao fechar/recarregar com alterações não salvas
 window.addEventListener('beforeunload', function(e){
   if(_dirtyFlag){
@@ -5141,6 +5354,14 @@ window.addEventListener('load',function(){
         ✓ Restaurar
       </button>
     </div>
+  </div>
+</div>
+
+<!-- MODAL NOMES DOS FATORES -->
+<div id="fat-nomes-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:4000;align-items:center;justify-content:center">
+  <div style="background:var(--surf);border:2px solid var(--grn);border-radius:10px;
+              width:min(420px,95vw);max-height:85vh;overflow-y:auto">
+    <div id="fat-nomes-body"></div>
   </div>
 </div>
 
