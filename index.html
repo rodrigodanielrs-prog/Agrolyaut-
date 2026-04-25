@@ -2075,54 +2075,91 @@ function drawExp(exp) {
       }
       exp.layers.push(poly);
       var ctr=offsetM(lat,lng,x0+pw/2,y0+ph/2,deg);
-      // Label proporcional — sempre paralelo ao COMPRIMENTO da parcela
+      // Label do tratamento — sempre paralelo ao EIXO MAIS LONGO da parcela
       (function(_nm, _pw, _ph, _deg){
         var z = MAP.getZoom();
-        if(z < 20) return;  // não exibe abaixo de zoom 20
+        if(z < 20) return;
 
         var mPx = Math.pow(2, z) * 256 / 40075016.7 * Math.cos(ctr.lat * Math.PI/180);
-        var wPx = Math.round(_pw * mPx);  // largura da parcela em px (eixo curto)
-        var hPx = Math.round(_ph * mPx);  // comprimento da parcela em px (eixo longo)
+        var wPx = Math.max(2, Math.round(_pw * mPx));  // pw em pixels
+        var hPx = Math.max(2, Math.round(_ph * mPx));  // ph em pixels
 
-        // Fonte proporcional à LARGURA (eixo curto) — para o texto caber entre as bordas
-        // mas o texto se estende ao longo do COMPRIMENTO
-        var fSize = Math.min(18, Math.max(7, Math.floor(wPx * 0.55)));
+        // Determina qual é o eixo longo da parcela
+        var longPx, shortPx, longIsH;
+        if(hPx >= wPx){
+          longPx  = hPx;   // comprimento (ph) é o eixo longo
+          shortPx = wPx;   // largura (pw) é o eixo curto
+          longIsH = false; // eixo longo aponta para a direção 'h' (offset y, antes da rotação)
+        } else {
+          longPx  = wPx;   // largura (pw) é o eixo longo
+          shortPx = hPx;   // comprimento (ph) é o eixo curto
+          longIsH = true;
+        }
 
-        // Trunca baseado no COMPRIMENTO da parcela
-        var label = _nm;
-        var maxChars = Math.max(3, Math.floor(hPx / (fSize * 0.55)));
-        if(label.length > maxChars) label = label.slice(0, maxChars-1) + '…';
+        // Fonte proporcional ao eixo CURTO (não pode ser maior que a largura)
+        var fSize = Math.min(20, Math.max(8, Math.floor(shortPx * 0.55)));
 
-        // O HTML interno tem dimensões hPx × wPx (comprimento × largura)
-        // antes da rotação. Depois é rotacionado pelo ângulo da parcela.
-        var html = '<div style="'+
-          'width:'+hPx+'px;'+
-          'height:'+wPx+'px;'+
-          'display:flex;align-items:center;justify-content:center;'+
-          'font-size:'+fSize+'px;'+
-          'font-family:Inter,Arial,sans-serif;'+
-          'font-weight:700;'+
-          'color:#fff;'+
-          'text-shadow:0 1px 3px rgba(0,0,0,.95),0 0 5px rgba(0,0,0,.8);'+
-          'text-align:center;'+
-          'line-height:1;'+
-          'pointer-events:none;'+
-          'white-space:nowrap;'+
-          'overflow:hidden;'+
-          'transform:rotate('+_deg+'deg);'+
-          'transform-origin:center center;'+
-          '">'+label+'</div>';
+        // Trunca baseado no eixo LONGO
+        var maxChars = Math.max(3, Math.floor(longPx / (fSize * 0.55)));
+        var label = _nm.length > maxChars ? _nm.slice(0, maxChars-1) + '…' : _nm;
 
-        // O icon precisa ter dimensão suficiente para acomodar o div rotacionado
-        // Usamos hPx×hPx como caixa quadrada para qualquer ângulo caber
-        var box = Math.max(hPx, wPx) + 4;
+        // Cálculo de rotação CSS:
+        // Em offsetM(dx,dy,deg=0): dx aponta Leste, dy aponta Norte (no mapa)
+        //   Mas em pixels da tela, Norte = -y (para cima)
+        //   Então no DOM: dx (pw) → +X horizontal, dy (ph) → -Y vertical (vira UP)
+        // 
+        // Quando deg aumenta, a parcela rotaciona no sentido horário no mapa
+        // Em CSS, rotate(N deg) também é horário, mas:
+        //   - eixo Y do CSS aponta PARA BAIXO
+        //   - eixo Y do mapa aponta PARA CIMA
+        // Logo o sinal precisa ser invertido: cssAngle = -deg
+        //
+        // Para alinhar o texto ao eixo longo:
+        //   - se eixo longo é ph (longIsH=false): no modelo aponta para Norte (em deg=0)
+        //     → no CSS aponta para -Y (UP), então texto deve estar -90° (rotacionado vertical)
+        //     → cssRotate = -deg - 90
+        //   - se eixo longo é pw (longIsH=true): no modelo aponta para Leste (em deg=0)
+        //     → no CSS aponta para +X (RIGHT), texto na orientação natural
+        //     → cssRotate = -deg
+        var cssRotate = longIsH ? (-_deg) : (-_deg - 90);
 
-        exp.layers.push(L.marker(ctr,{icon:L.divIcon({
-          html: '<div style="width:'+box+'px;height:'+box+'px;display:flex;align-items:center;justify-content:center">'+html+'</div>',
-          iconSize: [box, box],
-          iconAnchor: [box/2, box/2],
-          className: ''
-        }), interactive:false, zIndexOffset:-100}).addTo(MAP));
+        // Normaliza para evitar texto de cabeça pra baixo (entre 90° e 270°)
+        // — espelha 180° quando necessário
+        var rotMod = ((cssRotate % 360) + 360) % 360;
+        if(rotMod > 90 && rotMod < 270) cssRotate += 180;
+
+        // Caixa quadrada que acomoda qualquer rotação
+        var box = longPx + 10;
+
+        var html =
+          '<div style="width:'+box+'px;height:'+box+'px;'+
+            'display:flex;align-items:center;justify-content:center;'+
+            'pointer-events:none">'+
+            '<div style="'+
+              'width:'+longPx+'px;'+
+              'text-align:center;'+
+              'font-size:'+fSize+'px;'+
+              'font-family:Inter,Arial,sans-serif;'+
+              'font-weight:700;'+
+              'color:#fff;'+
+              'text-shadow:0 1px 2px rgba(0,0,0,.95),0 0 4px rgba(0,0,0,.85);'+
+              'line-height:1;'+
+              'white-space:nowrap;'+
+              'overflow:hidden;'+
+              'transform:rotate('+cssRotate+'deg);'+
+            '">'+label+'</div>'+
+          '</div>';
+
+        exp.layers.push(L.marker(ctr,{
+          icon: L.divIcon({
+            html: html,
+            iconSize: [box, box],
+            iconAnchor: [box/2, box/2],
+            className: 'trat-label'
+          }),
+          interactive: false,
+          zIndexOffset: -100
+        }).addTo(MAP));
       })(nm, pw, ph, deg);
       gj.push({type:'Feature',
         properties:{exp:exp.id,exp_nome:exp.name,bloco:b+1,trat_idx:tIdx+1,trat_nome:nm},
