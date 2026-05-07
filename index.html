@@ -1718,8 +1718,43 @@ function renderE1Summary() {
     }
     m2+=Math.abs(a)/2;
   });
+  // Área de cada experimento
+  var expAreaHtml = '';
+  var totalExpM2  = 0;
+  exps.forEach(function(exp){
+    if(exp.visible === false) return;
+    var nB  = exp.delin==='NONE'?1:exp.nBlocos;
+    var nT  = exp.nTrat;
+    var nP  = nB * nT;
+    var pw  = parseFloat(exp.pLarg)||0.17;
+    var ph  = parseFloat(exp.pComp)||5;
+    var et  = parseFloat(exp.espTrat)||0;
+    var eb  = parseFloat(exp.espBlocos)||0;
+    var bW  = nT*pw + (nT-1)*et;
+    var tH  = nB*ph + (nB-1)*eb;
+    var haExp = bW * tH / 10000;
+    totalExpM2 += bW * tH;
+    expAreaHtml += '<div class="sum-row" style="padding-left:12px;font-size:11px">'+
+      '<span style="color:var(--txt)">'+
+        '<span style="display:inline-block;width:10px;height:10px;border-radius:2px;'+
+        'background:'+exp.color+';margin-right:6px;vertical-align:middle"></span>'+
+        xe(exp.name)+
+      '</span>'+
+      '<b style="color:var(--grn)">'+haExp.toFixed(4)+' ha</b>'+
+      '</div>';
+  });
+
   var h='';
-  if(areas.length) h+='<div class="sum-row"><span>🟩 Área</span><b class="grn">'+(m2/10000).toFixed(4)+' ha</b></div>';
+  if(areas.length){
+    h += '<div class="sum-row"><span>🟩 Área demarcada</span><b class="grn">'+(m2/10000).toFixed(4)+' ha</b></div>';
+  }
+  if(exps.length){
+    h += '<div class="sum-row" style="margin-top:6px">'+
+      '<span>🧪 Experimentos ('+exps.filter(function(e){return e.visible!==false;}).length+')</span>'+
+      '<b class="grn">'+(totalExpM2/10000).toFixed(4)+' ha total</b>'+
+      '</div>';
+    h += expAreaHtml;
+  }
   if(terrs.length){
     var td=0; terrs.forEach(function(f){
   var lls=null;
@@ -1966,8 +2001,14 @@ function randomize(exp) {
     fatGerarNomes(exp); return;
   }
 
-  // DBC / DIC / NONE padrão
-  var nB = exp.delin==='NONE'?1:exp.nBlocos;
+  // Sem delineamento: ordem sequencial fixa, sem sorteio
+  if(exp.delin === 'NONE'){
+    exp.allocs.push(Array.from({length:exp.nTrat},function(_,i){return i;}));
+    return;
+  }
+
+  // DBC / DIC: sorteio aleatório
+  var nB = exp.nBlocos;
   for(var b=0;b<nB;b++){
     if(b===0 && exp.bloco1Fixed)
       exp.allocs.push(Array.from({length:exp.nTrat},function(_,i){return i;}));
@@ -2056,7 +2097,7 @@ function addMarker(exp) {
   exp.marker.on('dragstart',function(){
     if(exp._dragTimer){ clearTimeout(exp._dragTimer); exp._dragTimer=null; }
   });
-  exp.marker.on('dragend',function(){ fitExp(exp); });
+  // dragend: NÃO chama fitExp — preserva zoom atual do usuário
   exp.marker.on('click',function(){ selectExp(exp.id); });
 }
 
@@ -3508,7 +3549,8 @@ function printCroqui(expList){
       + '<div><span>Parcela: </span><b>' + exp.pLarg + ' × ' + exp.pComp + ' m</b></div>'
       + '<div><span>Tratamentos: </span><b>' + nT + '</b></div>'
       + '<div><span>Blocos: </span><b>' + (exp.delin==='NONE'?'–':nB) + '</b></div>'
-      + '<div><span>Área total: </span><b>' + bW + ' × ' + tH + ' m (' + ha + ' ha)</b></div>'
+      + '<div><span>Área bruta: </span><b>' + bW + ' × ' + tH + ' m (' + ha + ' ha)</b></div>'
+      + '<div><span>Área líquida: </span><b>' + (nP*exp.pLarg*exp.pComp/10000).toFixed(4) + ' ha (' + nP + ' parcelas)</b></div>'
       + '<div><span>Rotação: </span><b>' + exp.angle + '°</b></div>'
       + (exp.espBlocos>0?'<div><span>Esp. blocos: </span><b>'+exp.espBlocos+' m</b></div>':'')
       + (exp.espTrat>0?'<div><span>Esp. parcelas: </span><b>'+exp.espTrat+' m</b></div>':'')
