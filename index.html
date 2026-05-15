@@ -1117,6 +1117,7 @@ body{background:var(--bg);color:var(--txt);font-family:var(--fm);font-size:12px;
     <div class="logo">Agro<span>Layout</span></div>
     <div class="hsp"></div>
     <button class="icon-btn" onclick="loadProject()" title="Carregar projeto">📂</button>
+    <button class="icon-btn" id="undo-btn" onclick="undo()" title="Desfazer última ação (Ctrl+Z)" style="opacity:.4">↶</button>
     <button class="icon-btn" id="save-btn" onclick="saveProject()" title="Salvar projeto">💾</button>
     <button class="icon-btn" onclick="showTutAgain()" title="Ajuda / Tutorial" style="color:var(--grn);font-weight:700;font-size:14px">?</button>
   </div>
@@ -1592,7 +1593,36 @@ function startTool(type) {
     ? new L.Draw.Polygon(MAP,{shapeOptions:sty,showArea:true,allowIntersection:false})
     : new L.Draw.Polyline(MAP,{shapeOptions:sty});
   drawH.enable();
-  setSt('Clique no mapa para desenhar: '+cfg.label, true);
+  setSt('Toque para inserir pontos · 2 dedos para mover/zoom · duplo-toque para finalizar', true);
+  installTwoFingerGuard();
+}
+
+// Bloqueia o handler de toque do Leaflet.Draw quando o usuário usa 2 dedos
+// (movimentação/pinch). Restaura quando volta a 1 dedo.
+var _twoFingerGuardInstalled = false;
+function installTwoFingerGuard(){
+  if(_twoFingerGuardInstalled) return;
+  _twoFingerGuardInstalled = true;
+  var mapContainer = MAP.getContainer();
+
+  mapContainer.addEventListener('touchstart', function(e){
+    if(!drawH) return;
+    if(e.touches && e.touches.length >= 2){
+      // 2+ dedos → desabilita temporariamente o desenho para liberar pan/zoom
+      try { drawH.disable(); } catch(err){}
+      drawH._wasEnabled = true;
+    }
+  }, {passive:true, capture:true});
+
+  mapContainer.addEventListener('touchend', function(e){
+    if(!drawH) return;
+    // Quando todos os dedos saem, restaura o desenho na próxima interação
+    if(e.touches && e.touches.length === 0 && drawH._wasEnabled){
+      drawH._wasEnabled = false;
+      // pequeno delay para evitar capturar o touchend como clique
+      setTimeout(function(){ try { drawH.enable(); } catch(err){} }, 150);
+    }
+  }, {passive:true, capture:true});
 }
 
 function cancelDraw() {
@@ -2061,6 +2091,7 @@ function getAreaCenter() {
 }
 
 function addExp() {
+  snapshotState();
   var pos = getAreaCenter();
   var exp = newExp(pos.lat, pos.lng);
   randomize(exp);
@@ -2085,6 +2116,7 @@ function addMarker(exp) {
     })
   }).addTo(MAP);
   exp.marker.bindTooltip(exp.name+' — arraste para mover',{direction:'top'});
+  exp.marker.on('dragstart',function(){ snapshotState(); });
   exp.marker.on('drag',function(e){
     exp.lat=e.latlng.lat; exp.lng=e.latlng.lng;
     // Throttle redraw — mobile performance
@@ -2311,6 +2343,7 @@ function selectExp(id) {
 }
 
 function duplicateExp(id){
+  snapshotState();
   var orig = exps.find(function(e){ return e.id===id; });
   if(!orig) return;
 
@@ -2388,6 +2421,7 @@ function toggleB1(id){
 function renderExpList() {
   var el=document.getElementById('exp-list');
   if(!exps.length){el.innerHTML='<div class="empty">Nenhum experimento ainda</div>';return;}
+  snapshotState();
   var allVis=exps.every(function(e){return e.visible!==false;});
   var noneVis=exps.every(function(e){return e.visible===false;});
   el.innerHTML='<div style="display:flex;gap:6px;margin-bottom:6px;padding:0 2px">'
@@ -2716,9 +2750,11 @@ function renderVars(){
 }
 
 function updVar(id,key,val){var v=vars.find(function(x){return x.id===id;});if(v){v[key]=val;renderVars();autoSaveProject();}}
-function delVar(id){vars=vars.filter(function(v){return v.id!==id;});renderVars();autoSaveProject();}
+function delVar(id){
+  snapshotState();vars=vars.filter(function(v){return v.id!==id;});renderVars();autoSaveProject();}
 function addVar(){
   var nm=document.getElementById('v-name').value.trim();
+  if(nm) snapshotState();
   if(!nm){toast('Digite o nome','ty');return;}
   vars.push({id:nextVarId++,name:nm,
     unit:document.getElementById('v-unit').value.trim(),
@@ -4612,6 +4648,7 @@ function renderModeloLista(){
 }
 
 function usarModelo(modeloId){
+  snapshotState();
   var lista  = modeloLoad();
   var modelo = lista.find(function(m){ return m.id === modeloId; });
   if(!modelo){ toast('Modelo não encontrado','tr'); return; }
@@ -5106,6 +5143,7 @@ function sorteioPreencherSequencial(){
 function aplicarSorteioManual(){
   var exp = getExp(_sorteioExpId);
   if(!exp) return;
+  snapshotState();
   var nB = exp.delin==='NONE' ? 1 : exp.nBlocos;
   var nT = exp.nTrat;
 
@@ -5171,6 +5209,7 @@ function limparSorteioManual(expId){
   var exp = getExp(expId);
   if(!exp) return;
   if(!confirm('Remover sorteio manual e voltar ao sorteio aleatório?')) return;
+  snapshotState();
   delete exp.sorteioManual;
   randomize(exp);
   drawExp(exp);
@@ -5288,6 +5327,125 @@ function aplicarFatNomes(id, fator){
   autoSaveLastProject();
   toast('✓ Nomes do Fator '+fator+' aplicados');
 }
+
+
+/* ══════════════════════════════════════════════════════════════
+   SISTEMA DE DESFAZER (UNDO) — guarda até 10 estados anteriores
+   ══════════════════════════════════════════════════════════════ */
+
+var _undoStack = [];
+var _undoMax   = 10;
+var _undoFreeze = false;  // evita push durante restauração
+
+function snapshotState(){
+  if(_undoFreeze) return;
+  try {
+    var state = {
+      e1: areaFeats.map(function(f){return JSON.parse(JSON.stringify({type:f.type,name:f.name,info:f.info,gj:f.gj}));}),
+      exps: exps.map(function(exp){return JSON.parse(JSON.stringify({
+        id:exp.id,name:exp.name,color:exp.color,lat:exp.lat,lng:exp.lng,
+        angle:exp.angle,delin:exp.delin,nTrat:exp.nTrat,nBlocos:exp.nBlocos,
+        nLinhas:exp.nLinhas,espLinhas:exp.espLinhas,pLarg:exp.pLarg,
+        pComp:exp.pComp,espTrat:exp.espTrat,espBlocos:exp.espBlocos,
+        bloco1Fixed:exp.bloco1Fixed,visible:exp.visible,
+        tratNames:exp.tratNames,allocs:exp.allocs,
+        dataSemeadura:exp.dataSemeadura,cultura:exp.cultura,
+        sorteioManual:exp.sorteioManual,
+        nFatA:exp.nFatA,nFatB:exp.nFatB,
+        fatANames:exp.fatANames,fatBNames:exp.fatBNames
+      }));}),
+      vars: JSON.parse(JSON.stringify(vars)),
+      nextExpId: nextExpId,
+      nextVarId: nextVarId
+    };
+    _undoStack.push(state);
+    if(_undoStack.length > _undoMax) _undoStack.shift();
+    updateUndoButton();
+  } catch(e){ console.warn('snapshot failed:', e); }
+}
+
+function updateUndoButton(){
+  var btn = document.getElementById('undo-btn');
+  if(!btn) return;
+  if(_undoStack.length > 0){
+    btn.style.opacity = '1';
+    btn.style.cursor = 'pointer';
+    btn.disabled = false;
+    btn.title = 'Desfazer (' + _undoStack.length + ' ações disponíveis)';
+  } else {
+    btn.style.opacity = '.4';
+    btn.style.cursor = 'default';
+    btn.disabled = true;
+    btn.title = 'Nada para desfazer';
+  }
+}
+
+function undo(){
+  if(!_undoStack.length){
+    toast('Nada para desfazer','ty');
+    return;
+  }
+  var state = _undoStack.pop();
+  _undoFreeze = true;
+
+  try {
+    // Limpa estado atual
+    exps.forEach(function(exp){
+      if(exp.marker) MAP.removeLayer(exp.marker);
+      if(exp.layers) exp.layers.forEach(function(l){ MAP.removeLayer(l); });
+    });
+    areaLayers.forEach(function(l){ MAP.removeLayer(l); });
+    exps        = [];
+    areaFeats   = [];
+    areaLayers  = [];
+    vars        = [];
+
+    // Restaura
+    nextExpId  = state.nextExpId || 1;
+    nextVarId  = state.nextVarId || 1;
+    vars       = state.vars || [];
+
+    // Restaura áreas
+    state.e1.forEach(function(d){
+      addAreaFeature(d.type, d.gj, d.name, d.info);
+    });
+
+    // Restaura experimentos
+    state.exps.forEach(function(d){
+      var exp = newExp(d.lat, d.lng);
+      Object.assign(exp, d);
+      exps.push(exp);
+      addMarker(exp);
+      drawExp(exp);
+    });
+
+    renderE1List();
+    renderE1Summary();
+    renderExpList();
+    renderExpPanel();
+    renderVars();
+    autoSaveLastProject();
+
+    toast('↶ Desfeito ('+_undoStack.length+' restantes)');
+  } catch(e){
+    console.error('Undo failed:', e);
+    toast('Erro ao desfazer','tr');
+  } finally {
+    _undoFreeze = false;
+    updateUndoButton();
+  }
+}
+
+// Atalho Ctrl+Z (desktop)
+window.addEventListener('keydown', function(e){
+  if((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey){
+    // Ignora se está em input/textarea
+    var tag = (e.target.tagName||'').toUpperCase();
+    if(tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+    e.preventDefault();
+    undo();
+  }
+});
 
 // Aviso ao fechar/recarregar com alterações não salvas
 window.addEventListener('beforeunload', function(e){
