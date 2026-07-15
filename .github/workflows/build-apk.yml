@@ -85,26 +85,39 @@ jobs:
           }
           GRADEOF
 
-      - name: Generate keystore
+      - name: Restore or generate keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          keytool -genkey -v \
-            -keystore agrolayout.keystore \
-            -alias agrolayout \
-            -keyalg RSA -keysize 2048 -validity 10000 \
-            -storepass agrolayout123 \
-            -keypass agrolayout123 \
-            -dname "CN=AgroLayout, OU=SETREM, O=SETREM, L=Tres de Maio, ST=RS, C=BR"
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "Using persisted keystore from repository secrets"
+            echo "$KEYSTORE_BASE64" | base64 -d > agrolayout.keystore
+          else
+            echo "::warning::ANDROID_KEYSTORE_BASE64 secret not set — generating a throwaway keystore. Every build will be signed differently and in-place updates on Android will fail. Add ANDROID_KEYSTORE_BASE64/ANDROID_KEYSTORE_PASSWORD/ANDROID_KEY_PASSWORD secrets to sign releases consistently."
+            keytool -genkey -v \
+              -keystore agrolayout.keystore \
+              -alias agrolayout \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -storepass "${KEYSTORE_PASSWORD:-agrolayout123}" \
+              -keypass "${KEY_PASSWORD:-agrolayout123}" \
+              -dname "CN=AgroLayout, OU=SETREM, O=SETREM, L=Tres de Maio, ST=RS, C=BR"
+          fi
 
       - name: Configure signing
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          cat >> android/app/build.gradle << 'GRADEOF'
+          cat >> android/app/build.gradle << GRADEOF
 
           android.signingConfigs {
               release {
-                  storeFile file("$rootDir/../agrolayout.keystore")
-                  storePassword "agrolayout123"
+                  storeFile file("\$rootDir/../agrolayout.keystore")
+                  storePassword "${KEYSTORE_PASSWORD:-agrolayout123}"
                   keyAlias "agrolayout"
-                  keyPassword "agrolayout123"
+                  keyPassword "${KEY_PASSWORD:-agrolayout123}"
               }
           }
           android.buildTypes.release.signingConfig = android.signingConfigs.release
