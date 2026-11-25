@@ -9,31 +9,37 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Setup Java 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           java-version: '21'
           distribution: 'temurin'
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
+      # O runner do GitHub já vem com o Android SDK instalado (ANDROID_HOME).
+      # A ação android-actions/setup-android@v3 foi retirada: ela tentava instalar o
+      # pacote "tools", que o Google removeu, e o build parava com
+      # "Failed to find package 'tools'".
       - name: Install SDK components
         run: |
-          yes | sdkmanager --licenses || true
-          sdkmanager "build-tools;34.0.0" "platforms;android-34" "platform-tools"
+          SDKM="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -x "$SDKM" ]; then SDKM="$(ls -d $ANDROID_HOME/cmdline-tools/*/bin/sdkmanager | tail -1)"; fi
+          echo "sdkmanager: $SDKM"
+          yes | "$SDKM" --licenses > /dev/null || true
+          "$SDKM" "platform-tools" "platforms;android-35" "build-tools;35.0.0"
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
-          node-version: '20'
+          node-version: '22'
 
+      # Versão do Capacitor fixada na 7 (Android 35). Sem fixar, o npm instala a
+      # mais nova e o build quebra sozinho quando ela muda de requisitos.
       - name: Install Capacitor
         run: |
           npm init -y
-          npm install @capacitor/core @capacitor/cli @capacitor/android
+          npm install @capacitor/core@7 @capacitor/cli@7 @capacitor/android@7
 
       - name: Configure Capacitor (local mode - no remote URL)
         run: |
@@ -71,6 +77,7 @@ jobs:
       - name: Add GPS and storage permissions to AndroidManifest
         run: |
           sed -i 's|<uses-permission android:name="android.permission.INTERNET" />|<uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />\n    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />\n    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />|' android/app/src/main/AndroidManifest.xml
+          grep -c "ACCESS_FINE_LOCATION" android/app/src/main/AndroidManifest.xml
 
       - name: Fix Kotlin duplicate classes
         run: |
