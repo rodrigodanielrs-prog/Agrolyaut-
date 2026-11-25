@@ -5209,6 +5209,15 @@ function fitExp(exp) {
   ),{padding:[60,60],maxZoom:23});
 }
 
+// (v57) enquadra tudo o que o projeto tem: experimentos e talhões/áreas desenhados
+function enquadrarProjeto(){
+  try{
+    var b=L.latLngBounds([]);
+    exps.forEach(function(exp){ (exp._gj||[]).forEach(function(f){ f.geometry.coordinates[0].forEach(function(c){ b.extend([c[1],c[0]]); }); }); });
+    (areaLayers||[]).forEach(function(l){ try{ var lb=l.getBounds&&l.getBounds(); if(lb&&lb.isValid()) b.extend(lb); }catch(e){} });
+    if(b.isValid()) MAP.fitBounds(b,{padding:[60,60],maxZoom:20});
+  }catch(e){ console.warn('enquadrar', e); }
+}
 function fitAll() {
   var lats=[],lngs=[];
   exps.forEach(function(exp){
@@ -6587,7 +6596,7 @@ function _croquiSVG(exp){
   var x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;
   P.forEach(function(p){ p.pts.forEach(function(q){ x0=Math.min(x0,q[0]); y0=Math.min(y0,q[1]); x1=Math.max(x1,q[0]); y1=Math.max(y1,q[1]); }); });
   var pad=5, W=x1-x0+2*pad, H=y1-y0+2*pad+4, ox=x0-pad, oy=y0-pad-4;
-  var lado=Math.min(expPw(exp), exp.pComp||5), fT=Math.max(0.25,lado*0.46), fP=fT*0.6;
+  var lado=Math.min(expPw(exp), exp.pComp||5), fT=Math.max(0.25,lado*0.46), fP=fT*0.92;
   function f(n){ return (Math.round(n*100)/100); }
   var o=['<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 '+f(W)+' '+f(H)+'" style="width:100%;max-height:235mm;display:block;margin:4px 0 10px;background:#fff;overflow:hidden" font-family="Arial,sans-serif">'];
   var TL=_croquiTalhao(exp);
@@ -6598,8 +6607,8 @@ function _croquiSVG(exp){
     var pn=(est&&est[p.b]&&est[p.b][p.t]!=null)?est[p.b][p.t]:(p.b*nT+p.t+1);
     o.push('<polygon points="'+p.pts.map(function(q){ return f(q[0]-ox)+','+f(q[1]-oy); }).join(' ')+'" fill="#'+bg+'" fill-opacity=".45" stroke="#333" stroke-width="'+f(lado*0.03)+'"/>');
     var cx=f(p.c[0]-ox), cy=f(p.c[1]-oy);
-    o.push('<text x="'+cx+'" y="'+f(cy-fT*0.15)+'" font-size="'+f(fP)+'" fill="#444" text-anchor="middle">'+pn+'</text>');
-    o.push('<text x="'+cx+'" y="'+f(cy+fT*0.85)+'" font-size="'+f(fT)+'" font-weight="700" fill="#111" text-anchor="middle">T'+(tIdx+1)+'</text>');
+    o.push('<text x="'+cx+'" y="'+f(cy-fT*0.25)+'" font-size="'+f(fP)+'" font-weight="700" fill="#1f2a44" text-anchor="middle">'+pn+'</text>');
+    o.push('<text x="'+cx+'" y="'+f(cy+fT*0.95)+'" font-size="'+f(fT)+'" font-weight="700" fill="#111" text-anchor="middle">T'+(tIdx+1)+'</text>');
     var B=blc[p.b]=blc[p.b]||{x:0,y:0,n:0}; B.x+=p.c[0]; B.y+=p.c[1]; B.n++;
   });
   if(exp.delin!=='NONE') Object.keys(blc).forEach(function(b){ var B=blc[b];
@@ -7053,7 +7062,11 @@ function loadProjectFromFile(){
           renderExpList();renderExpPanel();
         }
         if(proj.vars){vars=proj.vars;nextVarId=vars.length?Math.max.apply(null,vars.map(function(v){return v.id;}))+1:7;renderVars();}
-        toast('✓ Projeto carregado!');
+        // (v57) leva o mapa até o que foi carregado e já salva no aparelho (antes o mapa
+        // ficava parado no ponto inicial e parecia que nada tinha sido importado)
+        enquadrarProjeto();
+        try{ autoSaveLastProject(); }catch(e){}
+        toast('✓ Projeto carregado: '+(proj.exps||[]).length+' experimento(s) e '+(proj.e1||[]).length+' área(s)',null,5000);
       }catch(ex){toast('Erro ao carregar','tr');console.error(ex);}
     };
     r.readAsText(e.target.files[0]);
@@ -9360,10 +9373,10 @@ function escolhaInicial(){
 function escolherMapa(id){
   if(id===curId){
     fecharCapa();
-    try{ if(typeof fitAll==='function') fitAll(); }catch(e){}
+    try{ enquadrarProjeto(); }catch(e){}
     msg('✓ Mapa aberto: '+curNome); return;
   }
-  abrirMapa(id).then(function(){ fecharCapa(); try{ if(typeof fitAll==='function') fitAll(); }catch(e){} })
+  abrirMapa(id).then(function(){ fecharCapa(); try{ enquadrarProjeto(); }catch(e){} })
                .catch(function(){ fecharCapa(); });
 }
 
